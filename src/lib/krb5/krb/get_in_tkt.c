@@ -1310,6 +1310,7 @@ krb5_init_creds_init(krb5_context context,
     int tmp;
     char *str = NULL;
     krb5_gic_opt_ext *opte;
+    krb5_get_init_creds_opt local_opts;
 
     ctx = k5alloc(sizeof(*ctx), &code);
     if (code != 0)
@@ -1332,9 +1333,12 @@ krb5_init_creds_init(krb5_context context,
     ctx->start_time = start_time;
 
     if (options == NULL) {
-        code = krb5_get_init_creds_opt_alloc(context, &options);
-        if (code != 0)
-            goto cleanup;
+        /* We initialize a non-extended options because that way the shadowed
+        flag will be sent and they will be freed when the init_creds context is
+        freed. The options will be extended and copied off the stack into
+        storage by opt_to_opte.*/
+        krb5_get_init_creds_opt_init(&local_opts);
+        options = &local_opts;
     }
 
     code = krb5int_gic_opt_to_opte(context, options,
@@ -1681,6 +1685,8 @@ init_creds_step_request(krb5_context context,
         goto cleanup;
 
 cleanup:
+    krb5_free_pa_data( context, ctx->request->padata);
+    ctx->request->padata = NULL;
     return code;
 }
 

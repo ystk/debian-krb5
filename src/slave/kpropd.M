@@ -74,7 +74,7 @@ Normally, kpropd is invoked out of
 This is done by adding a line to the inetd.conf file which looks like
 this:
 
-kprop	stream	tcp	nowait	root	/usr/local/sbin/kpropd	kpropd
+krb5_prop	stream	tcp	nowait	root	/usr/sbin/kpropd	kpropd
 
 However, kpropd can also run as a standalone daemon, if the
 .B \-S
@@ -111,13 +111,13 @@ is used.
 \fB\-f\fP \fIfile\fP
 specifies the filename where the dumped principal database file is to be
 stored; by default the dumped database file is KPROPD_DEFAULT_FILE
-(normally /usr/local/var/krb5kdc/from_master).
+(normally /var/lib/krb5kdc/from_master).
 .TP
 .B \-p
 allows the user to specify the pathname to the
 .IR kdb5_util (8)
 program; by default the pathname used is KPROPD_DEFAULT_KDB5_UTIL
-(normally /usr/local/sbin/kdb5_util).
+(normally /usr/sbin/kdb5_util).
 .TP
 .B \-S
 turn on standalone mode.  Normally, kpropd is invoked out of

@@ -319,53 +319,57 @@ open_connection(host, fd, Errmsg, ErrmsgSz)
     unsigned int     ErrmsgSz;
 {
     int     s;
-    krb5_error_code retval;
-
-    struct hostent  *hp;
-    register struct servent *sp;
-    struct sockaddr_in my_sin;
+    krb5_error_code retval = 1;
     GETSOCKNAME_ARG3_TYPE socket_length;
+    struct addrinfo hints, *res, *answers;
+    struct sockaddr *sa;
+    struct sockaddr_storage my_sin;
+    int error;
 
-    hp = gethostbyname(host);
-    if (hp == NULL) {
-        (void) snprintf(Errmsg, ErrmsgSz, "%s: unknown host", host);
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_flags = AI_ADDRCONFIG;
+    hints.ai_family = PF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    if ((error = getaddrinfo(host, KPROP_SERVICE, &hints, &answers)) != 0) {
+        (void) snprintf(Errmsg, ErrmsgSz, "%s: %s", host, gai_strerror(error));
         *fd = -1;
         return(0);
     }
-    my_sin.sin_family = hp->h_addrtype;
-    memcpy(&my_sin.sin_addr, hp->h_addr, sizeof(my_sin.sin_addr));
-    if(!port) {
-        sp = getservbyname(KPROP_SERVICE, "tcp");
-        if (sp == 0) {
-            my_sin.sin_port = htons(KPROP_PORT);
-        } else {
-            my_sin.sin_port = sp->s_port;
+    for (res = answers; res != NULL; res = res->ai_next) {
+        s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+        if (s < 0) {
+            (void) snprintf(Errmsg, ErrmsgSz, "in call to socket");
+            freeaddrinfo(answers);
+            return(errno);
         }
-    } else
-        my_sin.sin_port = port;
-    s = socket(AF_INET, SOCK_STREAM, 0);
+        if (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
+            retval = errno;
+            close(s);
+            s = -1;
+            continue;
+        }
 
-    if (s < 0) {
-        (void) snprintf(Errmsg, ErrmsgSz, "in call to socket");
-        return(errno);
+        /* We successfully connect()ed */
+        *fd = s;
+        if (sockaddr2krbaddr(res->ai_family, res->ai_addr, &receiver_addr) != 0) {
+            (void) snprintf(Errmsg, ErrmsgSz, "Bad address family");
+            *fd = -1;
+            return(0);
+        }
+
+        break;
     }
-    if (connect(s, (struct sockaddr *)&my_sin, sizeof my_sin) < 0) {
-        retval = errno;
-        close(s);
+
+    freeaddrinfo(answers);
+
+    if (s == -1) {
         (void) snprintf(Errmsg, ErrmsgSz, "in call to connect");
         return(retval);
     }
-    *fd = s;
 
     /*
-     * Set receiver_addr and sender_addr.
+     * Set sender_addr.
      */
-    receiver_addr.addrtype = ADDRTYPE_INET;
-    receiver_addr.length = sizeof(my_sin.sin_addr);
-    receiver_addr.contents = (krb5_octet *) malloc(sizeof(my_sin.sin_addr));
-    memcpy(receiver_addr.contents, &my_sin.sin_addr,
-           sizeof(my_sin.sin_addr));
-
     socket_length = sizeof(my_sin);
     if (getsockname(s, (struct sockaddr *)&my_sin, &socket_length) < 0) {
         retval = errno;
@@ -373,11 +377,15 @@ open_connection(host, fd, Errmsg, ErrmsgSz)
         (void) snprintf(Errmsg, ErrmsgSz, "in call to getsockname");
         return(retval);
     }
-    sender_addr.addrtype = ADDRTYPE_INET;
-    sender_addr.length = sizeof(my_sin.sin_addr);
-    sender_addr.contents = (krb5_octet *) malloc(sizeof(my_sin.sin_addr));
-    memcpy(sender_addr.contents, &my_sin.sin_addr,
-           sizeof(my_sin.sin_addr));
+
+    sa = (struct sockaddr *) &my_sin;
+
+    if (sockaddr2krbaddr(sa->sa_family, sa, &sender_addr) != 0) {
+        (void) snprintf(Errmsg, ErrmsgSz, "Bad address family");
+        close(s);
+        *fd = -1;
+        return(0);
+    }
 
     return(0);
 }

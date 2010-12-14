@@ -37,3 +37,5 @@
 #define KPROP_BUFSIZ 32768
 
 /* pathnames are in osconf.h, included via k5-int.h */
+
+int sockaddr2krbaddr(int family, struct sockaddr *sa, krb5_address *dest);

@@ -243,6 +243,7 @@ case $basic_machine in
 	| am33_2.0 \
 	| arc | arm | arm[bl]e | arme[lb] | armv[2345] | armv[345][lb] | avr | avr32 \
 	| bfin \
+	| bfin \
 	| c4x | clipper \
 	| d10v | d30v | dlx | dsp16xx \
 	| fr30 | frv \
@@ -286,6 +287,9 @@ case $basic_machine in
 	| we32k \
 	| x86 | xscale | xscalee[bl] | xstormy16 | xtensa \
 	| z8k)
+		basic_machine=$basic_machine-unknown
+		;;
+	m32c)
 		basic_machine=$basic_machine-unknown
 		;;
 	m6811 | m68hc11 | m6812 | m68hc12)
@@ -371,6 +375,8 @@ case $basic_machine in
 	| xstormy16-* | xtensa-* \
 	| ymp-* \
 	| z8k-*)
+		;;
+	m32c-*)
 		;;
 	# Recognize the various machine names and aliases which stand
 	# for a CPU type and a company and sometimes even an OS.

@@ -162,7 +162,7 @@ void    kerberos_authenticate(
     int,
     krb5_principal *,
     krb5_enctype *,
-    struct sockaddr_in);
+    struct sockaddr_storage *);
 krb5_boolean authorized_principal(krb5_context, krb5_principal, krb5_enctype);
 void    recv_database(krb5_context, int, int, krb5_data *);
 void    load_database(krb5_context, char *, char *);
@@ -242,10 +242,10 @@ static void resync_alarm(int sn)
 int do_standalone(iprop_role iproprole)
 {
     struct  sockaddr_in     my_sin, frominet;
-    struct servent *sp;
+    struct addrinfo hints, *res, *answers;
     int     finet, s;
     GETPEERNAME_ARG3_TYPE fromlen;
-    int     ret;
+    int     ret, error;
     /*
      * Timer for accept/read calls, in case of network type errors.
      */
@@ -253,92 +253,86 @@ int do_standalone(iprop_role iproprole)
 
 retry:
 
-    finet = socket(AF_INET, SOCK_STREAM, 0);
-    if (finet < 0) {
-        com_err(progname, errno, "while obtaining socket");
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
+
+    if ((error = getaddrinfo(NULL, KPROP_SERVICE, &hints, &answers)) != 0) {
+        (void) fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(error));
         exit(1);
     }
-    memset(&my_sin,0, sizeof(my_sin));
-    if(!port) {
-        sp = getservbyname(KPROP_SERVICE, "tcp");
-        if (sp == NULL) {
-            com_err(progname, 0, "%s/tcp: unknown service", KPROP_SERVICE);
-            my_sin.sin_port = htons(KPROP_PORT);
-        }
-        else my_sin.sin_port = sp->s_port;
-    } else {
-        my_sin.sin_port = port;
-    }
-    my_sin.sin_family = AF_INET;
 
-    /*
-     * We need to close the socket immediately if iprop is enabled,
-     * since back-to-back full resyncs are possible, so we do not
-     * linger around for too long
-     */
-    if (iproprole == IPROP_SLAVE) {
+    for (res = answers; res != NULL; res = res->ai_next) {
         int on = 1;
-        struct linger linger;
+         finet = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+        if (finet < 0) {
+            com_err(progname, errno, "while obtaining socket");
+            exit(1);
+        }
 
-        if (setsockopt(finet, SOL_SOCKET, SO_REUSEADDR,
-                       (char *)&on, sizeof(on)) < 0)
-            com_err(progname, errno,
-                    _("while setting socket option (SO_REUSEADDR)"));
-        linger.l_onoff = 1;
-        linger.l_linger = 2;
-        if (setsockopt(finet, SOL_SOCKET, SO_LINGER,
-                       (void *)&linger, sizeof(linger)) < 0)
-            com_err(progname, errno,
-                    _("while setting socket option (SO_LINGER)"));
+        if (setsockopt (finet, SOL_SOCKET, SO_REUSEADDR,
+                        (void *)&on, sizeof(on)) < 0)
+                com_err(progname, errno,
+                        _("while setting socket option (SO_REUSEADDR)"));
+
         /*
-         * We also want to set a timer so that the slave is not waiting
-         * until infinity for an update from the master.
+         * We need to close the socket immediately if iprop is enabled,
+         * since back-to-back full resyncs are possible, so we do not
+         * linger around for too long
          */
-        gfd = finet;
-        signal(SIGALRM, resync_alarm);
-        if (debug) {
-            fprintf(stderr, "do_standalone: setting resync alarm to %d\n",
-                    backoff_timer);
-        }
-        if (alarm(backoff_timer) != 0) {
+        if (iproprole == IPROP_SLAVE) {
+            struct linger linger;
+
+            linger.l_onoff = 1;
+            linger.l_linger = 2;
+            if (setsockopt(finet, SOL_SOCKET, SO_LINGER,
+                           (void *)&linger, sizeof(linger)) < 0)
+                com_err(progname, errno,
+                        _("while setting socket option (SO_LINGER)"));
+            /*
+             * We also want to set a timer so that the slave is not waiting
+             * until infinity for an update from the master.
+             */
+            gfd = finet;
+            signal(SIGALRM, resync_alarm);
             if (debug) {
-                fprintf(stderr,
-                        _("%s: alarm already set\n"), progname);
+                fprintf(stderr, "do_standalone: setting resync alarm to %d\n",
+                        backoff_timer);
             }
+            if (alarm(backoff_timer) != 0) {
+                if (debug) {
+                    fprintf(stderr,
+                            _("%s: alarm already set\n"), progname);
+                }
+            }
+            backoff_timer *= 2;
         }
-        backoff_timer *= 2;
-    }
-    if ((ret = bind(finet, (struct sockaddr *) &my_sin, sizeof(my_sin))) < 0) {
-        if (debug) {
-            int on = 1;
-            fprintf(stderr,
-                    "%s: attempting to rebind socket with SO_REUSEADDR\n",
-                    progname);
-            if (setsockopt(finet, SOL_SOCKET, SO_REUSEADDR,
-                           (char *)&on, sizeof(on)) < 0)
-                com_err(progname, errno, "in setsockopt(SO_REUSEADDR)");
-            ret = bind(finet, (struct sockaddr *) &my_sin, sizeof(my_sin));
-        }
-        if (ret < 0) {
+
+        if ((ret = bind(finet, res->ai_addr, res->ai_addrlen)) < 0) {
             perror("bind");
             com_err(progname, errno, "while binding listener socket");
             exit(1);
         }
-    }
-    if (!debug && iproprole != IPROP_SLAVE)
-        daemon(1, 0);
+        if (!debug && iproprole != IPROP_SLAVE)
+            daemon(1, 0);
 #ifdef PID_FILE
-    if ((pidfile = fopen(PID_FILE, "w")) != NULL) {
-        fprintf(pidfile, "%d\n", getpid());
-        fclose(pidfile);
-    } else
-        com_err(progname, errno,
-                "while opening pid file %s for writing", PID_FILE);
+        if ((pidfile = fopen(PID_FILE, "w")) != NULL) {
+            fprintf(pidfile, "%d\n", getpid());
+            fclose(pidfile);
+        } else
+            com_err(progname, errno,
+                    "while opening pid file %s for writing", PID_FILE);
 #endif
-    if (listen(finet, 5) < 0) {
-        com_err(progname, errno, "in listen call");
-        exit(1);
+
+        if (listen(finet, 5) < 0) {
+            com_err(progname, errno, "in listen call");
+            exit(1);
+        }
+        break;
     }
+
     while (1) {
         int child_pid;
         int status;
@@ -419,16 +413,16 @@ retry:
 void doit(fd)
     int     fd;
 {
-    struct sockaddr_in from;
+    struct sockaddr_storage from;
     int on = 1;
     GETPEERNAME_ARG3_TYPE fromlen;
-    struct hostent  *hp;
     krb5_error_code retval;
     krb5_data confmsg;
     int lock_fd;
     mode_t omask;
     krb5_enctype etype;
     int database_fd;
+    char host[INET6_ADDRSTRLEN+1];
 
     if (kpropd_context->kdblog_context &&
         kpropd_context->kdblog_context->iproprole == IPROP_SLAVE) {
@@ -468,23 +462,19 @@ void doit(fd)
                 "while attempting setsockopt (SO_KEEPALIVE)");
     }
 
-    if (!(hp = gethostbyaddr((char *) &(from.sin_addr.s_addr), fromlen,
-                             AF_INET))) {
-        syslog(LOG_INFO, "Connection from %s",
-               inet_ntoa(from.sin_addr));
+
+    if (getnameinfo((const struct sockaddr *) &from, fromlen,
+                    host, sizeof(host), NULL, 0, 0) == 0) {
+        syslog(LOG_INFO, "Connection from %s", host);
         if (debug)
-            printf("Connection from %s\n",
-                   inet_ntoa(from.sin_addr));
-    } else {
-        syslog(LOG_INFO, "Connection from %s", hp->h_name);
-        if (debug)
-            printf("Connection from %s\n", hp->h_name);
+            printf("Connection from %s\n", host);
     }
+
 
     /*
      * Now do the authentication
      */
-    kerberos_authenticate(kpropd_context, fd, &client, &etype, from);
+    kerberos_authenticate(kpropd_context, fd, &client, &etype, &from);
 
     /*
      * Turn off alarm upon successful authentication from master.
@@ -1216,22 +1206,18 @@ kerberos_authenticate(context, fd, clientp, etype, my_sin)
     int                   fd;
     krb5_principal      * clientp;
     krb5_enctype        * etype;
-    struct sockaddr_in    my_sin;
+    struct sockaddr_storage * my_sin;
 {
     krb5_error_code       retval;
     krb5_ticket         * ticket;
-    struct sockaddr_in    r_sin;
+    struct sockaddr_storage r_sin;
     GETSOCKNAME_ARG3_TYPE sin_length;
     krb5_keytab           keytab = NULL;
 
     /*
      * Set recv_addr and send_addr
      */
-    sender_addr.addrtype = ADDRTYPE_INET;
-    sender_addr.length = sizeof(my_sin.sin_addr);
-    sender_addr.contents = (krb5_octet *) malloc(sizeof(my_sin.sin_addr));
-    memcpy(sender_addr.contents, &my_sin.sin_addr,
-           sizeof(my_sin.sin_addr));
+    sockaddr2krbaddr(my_sin->ss_family, my_sin, &sender_addr);
 
     sin_length = sizeof(r_sin);
     if (getsockname(fd, (struct sockaddr *) &r_sin, &sin_length)) {
@@ -1239,11 +1225,7 @@ kerberos_authenticate(context, fd, clientp, etype, my_sin)
         exit(1);
     }
 
-    receiver_addr.addrtype = ADDRTYPE_INET;
-    receiver_addr.length = sizeof(r_sin.sin_addr);
-    receiver_addr.contents = (krb5_octet *) malloc(sizeof(r_sin.sin_addr));
-    memcpy(receiver_addr.contents, &r_sin.sin_addr,
-           sizeof(r_sin.sin_addr));
+    sockaddr2krbaddr(r_sin.ss_family, &r_sin, &receiver_addr);
 
     if (debug) {
         char *name;
