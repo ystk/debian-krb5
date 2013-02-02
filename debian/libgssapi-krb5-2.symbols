@@ -50,7 +50,7 @@ libgssapi_krb5.so.2 libgssapi-krb5-2 #MINVER#
  gss_krb5_export_lucid_sec_context@gssapi_krb5_2_MIT 1.6.dfsg.2
  gss_krb5_free_lucid_sec_context@gssapi_krb5_2_MIT 1.6.dfsg.2
  gss_krb5_get_tkt_flags@gssapi_krb5_2_MIT 1.6.dfsg.2
- gss_krb5_set_allowable_enctypes@gssapi_krb5_2_MIT 1.6.dfsg.2
+ gss_krb5_set_allowable_enctypes@gssapi_krb5_2_MIT 1.8.3+dfsg-4squeeze2
  gss_krb5_set_cred_rcache@gssapi_krb5_2_MIT 1.7+dfsg
  gss_krb5int_make_seal_token_v3@gssapi_krb5_2_MIT 1.6.dfsg.2
  gss_krb5int_unseal_token_v3@gssapi_krb5_2_MIT 1.6.dfsg.2
