@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/krb/tgtname.c */
 /*
- * lib/krb5/krb/tgtname.c
- *
  * Copyright 1990 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,18 +22,13 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
- * krb5_tgtname()
  */
 
 #include "k5-int.h"
 #include "int-proto.h"
 
-/* This is an internal-only function, used by krb5_get_cred_from_kdc() */
-
 krb5_error_code
-krb5_tgtname(krb5_context context, const krb5_data *server, const krb5_data *client, krb5_principal *tgtprinc)
+krb5int_tgtname(krb5_context context, const krb5_data *server, const krb5_data *client, krb5_principal *tgtprinc)
 {
     return krb5_build_principal_ext(context, tgtprinc, client->length, client->data,
                                     KRB5_TGS_NAME_SIZE, KRB5_TGS_NAME,

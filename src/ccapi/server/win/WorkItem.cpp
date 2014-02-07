@@ -45,16 +45,16 @@ void deleteBuffer(char** buf) {
         }
     }
 
-// WorkItem contains a CountedBuffer which must be deleted, 
+// WorkItem contains a CountedBuffer which must be deleted,
 //  so each WorkItem must be deleted.
-WorkItem::WorkItem(k5_ipc_stream buf, WIN_PIPE* pipe, const long type, const long sst) 
+WorkItem::WorkItem(k5_ipc_stream buf, WIN_PIPE* pipe, const long type, const long sst)
 : _buf(buf), _rpcmsg(type), _pipe(pipe), _sst(sst) { }
 
 WorkItem::WorkItem(const WorkItem& item) : _buf(NULL), _rpcmsg(0), _pipe(NULL), _sst(0) {
 
     k5_ipc_stream    _buf = NULL;
     krb5int_ipc_stream_new(&_buf);
-    krb5int_ipc_stream_write(_buf, 
+    krb5int_ipc_stream_write(_buf,
                      krb5int_ipc_stream_data(item.payload()),
                      krb5int_ipc_stream_size(item.payload()) );
     WorkItem(_buf, item._pipe, item._rpcmsg, item._sst);
@@ -98,15 +98,31 @@ WorkList::~WorkList() {
     }
 
 char* WorkItem::print(char* buf) {
-    sprintf(buf, "WorkItem msg#:%d sst:%ld pipe:<%s>/0x%X", _rpcmsg, _sst, 
+    sprintf(buf, "WorkItem msg#:%d sst:%ld pipe:<%s>/0x%X", _rpcmsg, _sst,
         ccs_win_pipe_getUuid(_pipe), ccs_win_pipe_getHandle(_pipe));
     return buf;
+    }
+
+int WorkList::initialize() {
+    hEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+    return 0;
+    }
+
+int WorkList::cleanup() {
+    CloseHandle(hEvent);
+    hEvent = INVALID_HANDLE_VALUE;
+    return 0;
+    }
+
+void WorkList::wait() {
+    WaitForSingleObject(hEvent, INFINITE);
     }
 
 int WorkList::add(WorkItem* item) {
     EnterCriticalSection(&cs);
         wl.push_front(item);
     LeaveCriticalSection(&cs);
+    SetEvent(hEvent);
     return 1;
     }
 

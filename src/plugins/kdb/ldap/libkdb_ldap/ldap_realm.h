@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* plugins/kdb/ldap/libkdb_ldap/ldap_realm.h */
 /*
- * lib/kdb/kdb_ldap/ldap_realm.h
- *
  * Copyright (c) 2004-2005, Novell, Inc.
  * All rights reserved.
  *
@@ -68,8 +67,6 @@ typedef struct _krb5_ldap_realm_params {
     char          **adminservers;
     char          **passwdservers;
     krb5_tl_data  *tl_data;
-    krb5_keyblock mkey;
-    krb5_keylist_node *mkey_list; /* all master keys in use for the realm */
     long          mask;
 } krb5_ldap_realm_params;
 

@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/crypto/krb/enctype_util.c */
 /*
- * lib/crypto/krb/enctype_util.c
- *
  * Copyright (C) 1998 by the FundsXpress, INC.
  *
  * All rights reserved.
@@ -25,8 +24,9 @@
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
- *
- *
+ */
+
+/*
  * krb5int_c_valid_enctype()
  * krb5int_c_weak_enctype()
  * krb5_c_enctype_compare()
@@ -34,8 +34,7 @@
  * krb5_enctype_to_string()
  */
 
-#include "k5-int.h"
-#include "etypes.h"
+#include "crypto_int.h"
 
 krb5_boolean KRB5_CALLCONV
 krb5_c_valid_enctype(krb5_enctype etype)
@@ -81,8 +80,7 @@ krb5_string_to_enctype(char *string, krb5_enctype *enctypep)
             *enctypep = ktp->etype;
             return 0;
         }
-#define MAX_ALIASES (sizeof(ktp->aliases) / sizeof(ktp->aliases[0]))
-        for (j = 0; j < MAX_ALIASES; j++) {
+        for (j = 0; j < MAX_ETYPE_ALIASES; j++) {
             alias = ktp->aliases[j];
             if (alias == NULL)
                 break;
@@ -105,6 +103,31 @@ krb5_enctype_to_string(krb5_enctype enctype, char *buffer, size_t buflen)
     if (ktp == NULL)
         return EINVAL;
     if (strlcpy(buffer, ktp->out_string, buflen) >= buflen)
+        return ENOMEM;
+    return 0;
+}
+
+krb5_error_code KRB5_CALLCONV
+krb5_enctype_to_name(krb5_enctype enctype, krb5_boolean shortest,
+                     char *buffer, size_t buflen)
+{
+    const struct krb5_keytypes *ktp;
+    const char *name;
+    int i;
+
+    ktp = find_enctype(enctype);
+    if (ktp == NULL)
+        return EINVAL;
+    name = ktp->name;
+    if (shortest) {
+        for (i = 0; i < MAX_ETYPE_ALIASES; i++) {
+            if (ktp->aliases[i] == NULL)
+                break;
+            if (strlen(ktp->aliases[i]) < strlen(name))
+                name = ktp->aliases[i];
+        }
+    }
+    if (strlcpy(buffer, name, buflen) >= buflen)
         return ENOMEM;
     return 0;
 }

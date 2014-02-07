@@ -1,8 +1,7 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* prototype/prototype.c - <<< One-line description of file >>> */
 /*
- * prototype/prototype.c
- *
- * Copyright (C) 2010 by the Massachusetts Institute of Technology.
+ * Copyright (C) 2011 by the Massachusetts Institute of Technology.
  * All rights reserved.
  *
  * Export of this software from the United States of America may
@@ -23,7 +22,8 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
- * <<< Description >>>
+ */
+
+/*
+ * <<< Longer description of file >>>
  */

@@ -25,11 +25,7 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include "k5-int.h"
-#include "enc_provider.h"
-#include "hash_provider.h"
-#include "dk.h"
-#include "cksumtypes.h"
+#include "crypto_int.h"
 
 const struct krb5_cksumtypes krb5int_cksumtypes_list[] = {
     { CKSUMTYPE_CRC32,
@@ -76,7 +72,7 @@ const struct krb5_cksumtypes krb5int_cksumtypes_list[] = {
 
     { CKSUMTYPE_HMAC_SHA1_DES3,
       "hmac-sha1-des3", { "hmac-sha1-des3-kd" }, "HMAC-SHA1 DES3 key",
-      NULL, &krb5int_hash_sha1,
+      &krb5int_enc_des3, &krb5int_hash_sha1,
       krb5int_dk_checksum, NULL,
       20, 20, 0 },
 
@@ -89,21 +85,35 @@ const struct krb5_cksumtypes krb5int_cksumtypes_list[] = {
 
     { CKSUMTYPE_HMAC_SHA1_96_AES128,
       "hmac-sha1-96-aes128", { 0 }, "HMAC-SHA1 AES128 key",
-      NULL, &krb5int_hash_sha1,
+      &krb5int_enc_aes128, &krb5int_hash_sha1,
       krb5int_dk_checksum, NULL,
       20, 12, 0 },
 
     { CKSUMTYPE_HMAC_SHA1_96_AES256,
       "hmac-sha1-96-aes256", { 0 }, "HMAC-SHA1 AES256 key",
-      NULL, &krb5int_hash_sha1,
+      &krb5int_enc_aes256, &krb5int_hash_sha1,
       krb5int_dk_checksum, NULL,
       20, 12, 0 },
 
     { CKSUMTYPE_MD5_HMAC_ARCFOUR,
       "md5-hmac-rc4", { 0 }, "Microsoft MD5 HMAC",
-      NULL, &krb5int_hash_md5,
+      &krb5int_enc_arcfour, &krb5int_hash_md5,
       krb5int_hmacmd5_checksum, NULL,
       16, 16, 0 },
+
+#ifdef CAMELLIA
+    { CKSUMTYPE_CMAC_CAMELLIA128,
+      "cmac-camellia128", { 0 }, "CMAC Camellia128 key",
+      &krb5int_enc_camellia128, NULL,
+      krb5int_dk_cmac_checksum, NULL,
+      16, 16, 0 },
+
+    { CKSUMTYPE_CMAC_CAMELLIA256,
+      "cmac-camellia256", { 0 }, "CMAC Camellia256 key",
+      &krb5int_enc_camellia256, NULL,
+      krb5int_dk_cmac_checksum, NULL,
+      16, 16, 0 },
+#endif /* CAMELLIA */
 };
 
 const size_t krb5int_cksumtypes_length =

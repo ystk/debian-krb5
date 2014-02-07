@@ -1,4 +1,29 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* tests/asn.1/krb5_encode_test.c */
+/*
+ * Copyright (C) 1994 by the Massachusetts Institute of Technology.
+ * All rights reserved.
+ *
+ * Export of this software from the United States of America may
+ *   require a specific license from the United States Government.
+ *   It is the responsibility of any person or organization contemplating
+ *   export to obtain such a license before exporting.
+ *
+ * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
+ * distribute this software and its documentation for any purpose and
+ * without fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright notice and
+ * this permission notice appear in supporting documentation, and that
+ * the name of M.I.T. not be used in advertising or publicity pertaining
+ * to distribution of the software without specific, written prior
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is" without express
+ * or implied warranty.
+ */
+
 #include <stdio.h>
 #include "k5-int.h"
 #include "com_err.h"
@@ -623,6 +648,12 @@ main(argc, argv)
         setup(enc_data,krb5_enc_data,"enc_data",ktest_make_sample_enc_data);
         current_appl_type = 1001;
         encode_run(enc_data,krb5_enc_data,"enc_data","",encode_krb5_enc_data);
+        enc_data.kvno = 0xFF000000;
+        current_appl_type = 1001;
+        encode_run(enc_data,krb5_enc_data,"enc_data","(MSB-set kvno)",encode_krb5_enc_data);
+        enc_data.kvno = 0xFFFFFFFF;
+        current_appl_type = 1001;
+        encode_run(enc_data,krb5_enc_data,"enc_data","(kvno=-1)",encode_krb5_enc_data);
         ktest_destroy_enc_data(&enc_data);
     }
     /****************************************************************/
@@ -739,6 +770,28 @@ main(argc, argv)
                    "ad_signedpath","",
                    encode_krb5_ad_signedpath);
         ktest_empty_ad_signedpath(&sp);
+    }
+    /****************************************************************/
+    /* encode_krb5_iakerb_header */
+    {
+        krb5_iakerb_header ih;
+        setup(ih,krb5_ad_signedpath,"iakerb_header",
+              ktest_make_sample_iakerb_header);
+        encode_run(ih,krb5_iakerb_header,
+                   "iakerb_header","",
+                   encode_krb5_iakerb_header);
+        ktest_empty_iakerb_header(&ih);
+    }
+    /****************************************************************/
+    /* encode_krb5_iakerb_finished */
+    {
+        krb5_iakerb_finished ih;
+        setup(ih,krb5_ad_signedpath,"iakerb_finished",
+              ktest_make_sample_iakerb_finished);
+        encode_run(ih,krb5_iakerb_finished,
+                   "iakerb_finished","",
+                   encode_krb5_iakerb_finished);
+        ktest_empty_iakerb_finished(&ih);
     }
 #ifdef ENABLE_LDAP
     {

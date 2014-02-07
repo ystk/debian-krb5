@@ -1,4 +1,4 @@
-mydir=tests/dejagnu
+mydir=tests$(S)dejagnu
 BUILDTOP=$(REL)..$(S)..
 RUNTEST = @RUNTEST@ $(DEJAFLAGS)
 RUNTESTFLAGS =
@@ -8,7 +8,9 @@ PROG_RPATH=$(KRB5_LIBDIR)
 
 SRCS=$(srcdir)/t_inetd.c
 
-all install::
+all:: t_inetd
+
+install::
 
 check:: check-runtest-@HAVE_RUNTEST@
 
@@ -31,18 +33,14 @@ clean::
 clean-unix::
 	$(RM) -rf tmpdir dbg.log krb.log krb.sum
 
-runenv.vars: Makefile
-	echo '$(KRB5_RUN_ENV)' | tr ';' '\012' | \
-		sed -ne 's% *\([^=]*\)=.*%\1%p' > runenv.vars
-
-runenv.vals: runenv.vars
-	$(KRB5_RUN_ENV) for i in `cat runenv.vars`; do \
+runenv.vals: Makefile
+	$(KRB5_RUN_ENV) for i in $(KRB5_RUN_VARS); do \
 		eval echo "{$$i=\$$$$i}"; done > runenv.vals
 
 site.exp: runenv.vals Makefile
 	echo "set runvarlist [list `cat runenv.vals | tr '\n' ' '`]" | \
 		sed -e 's%=\.%='`pwd`'/.%g' > site.exp
 	echo "set KRB5_DB_MODULE_DIR {$(KRB5_DB_MODULE_DIR)}" >> site.exp
-	echo "set KRB5_PA_MODULE_DIR {$(KRB5_PA_MODULE_DIR)}" >> site.exp
+	echo "set MODULE_DIR {$(MODULE_DIR)}" >> site.exp
 	echo "set PRIOCNTL_HACK @PRIOCNTL_HACK@" >> site.exp
 

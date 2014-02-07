@@ -7,10 +7,7 @@
 #ifndef _MISC_H
 #define _MISC_H 1
 
-typedef struct _krb5_fulladdr {
-    krb5_address *      address;
-    krb5_ui_4           port;
-} krb5_fulladdr;
+#include "net-server.h"         /* for krb5_fulladdr */
 
 void
 log_badauth(OM_uint32 major, OM_uint32 minor,
@@ -46,14 +43,6 @@ schpw_util_wrapper(void *server_handle, krb5_principal client,
 kadm5_ret_t check_min_life(void *server_handle, krb5_principal principal,
                            char *msg_ret, unsigned int msg_len);
 
-krb5_error_code process_chpw_request(krb5_context context,
-                                     void *server_handle,
-                                     char *realm,
-                                     krb5_keytab keytab,
-                                     krb5_fulladdr *local_faddr,
-                                     krb5_fulladdr *remote_faddr,
-                                     krb5_data *req, krb5_data *rep);
-
 void kadm_1(struct svc_req *, SVCXPRT *);
 void krb5_iprop_prog_1(struct svc_req *, SVCXPRT *);
 
@@ -64,18 +53,13 @@ gss_to_krb5_name_1(struct svc_req *rqstp, krb5_context ctx, gss_name_t gss_name,
                    krb5_principal *princ, gss_buffer_t gss_str);
 
 
-extern volatile int signal_request_exit;
-extern volatile int signal_request_hup;
-
 void reset_db(void);
 
 void log_badauth(OM_uint32 major, OM_uint32 minor,
                  struct sockaddr_in *addr, char *data);
 
 /* network.c */
-krb5_error_code setup_network(void *handle, const char *prog);
-krb5_error_code listen_and_process(void *handle, const char *prog);
-krb5_error_code closedown_network(void *handle, const char *prog);
+#include "net-server.h"
 
 
 void

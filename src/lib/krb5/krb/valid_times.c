@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/krb/valid_times.c */
 /*
- * lib/krb5/krb/valid_times.c
- *
  * Copyright 1995 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,12 +22,10 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
- * krb5_validate_times()
  */
 
 #include "k5-int.h"
+#include "int-proto.h"
 
 /*
  * This is an internal routine which validates the krb5_timestamps
@@ -36,7 +33,7 @@
  */
 
 krb5_error_code
-krb5_validate_times(krb5_context context, krb5_ticket_times *times)
+krb5int_validate_times(krb5_context context, krb5_ticket_times *times)
 {
     krb5_timestamp          currenttime, starttime;
     krb5_error_code         retval;

@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* plugins/kdb/ldap/libkdb_ldap/ldap_misc.c */
 /*
- * lib/kdb/kdb_ldap/ldap_misc.c
- *
  * Copyright (c) 2004-2005, Novell, Inc.
  * All rights reserved.
  *
@@ -85,8 +84,8 @@ prof_get_integer_def(krb5_context ctx, const char *conf_section,
                                KDB_MODULE_SECTION, conf_section, name,
                                0, &out_temp);
     if (err) {
-        krb5_set_error_message (ctx, err, "Error reading '%s' attribute: %s",
-                                name, error_message(err));
+        krb5_set_error_message(ctx, err, _("Error reading '%s' attribute: %s"),
+                               name, error_message(err));
         return err;
     }
     if (out_temp != 0) {
@@ -97,8 +96,39 @@ prof_get_integer_def(krb5_context ctx, const char *conf_section,
                                KDB_MODULE_DEF_SECTION, name, 0,
                                dfl, &out_temp);
     if (err) {
-        krb5_set_error_message (ctx, err, "Error reading '%s' attribute: %s",
-                                name, error_message(err));
+        krb5_set_error_message(ctx, err, _("Error reading '%s' attribute: %s"),
+                               name, error_message(err));
+        return err;
+    }
+    *out = out_temp;
+    return 0;
+}
+
+/* Get integer or string values from the config section, falling back
+   to the default section, then to hard-coded values.  */
+static errcode_t
+prof_get_boolean_def(krb5_context ctx, const char *conf_section,
+                     const char *name, krb5_boolean dfl, krb5_boolean *out)
+{
+    errcode_t err;
+    int out_temp = 0;
+
+    err = profile_get_boolean(ctx->profile, KDB_MODULE_SECTION, conf_section,
+                              name, -1, &out_temp);
+    if (err) {
+        krb5_set_error_message(ctx, err, _("Error reading '%s' attribute: %s"),
+                               name, error_message(err));
+        return err;
+    }
+    if (out_temp != -1) {
+        *out = out_temp;
+        return 0;
+    }
+    err = profile_get_boolean(ctx->profile, KDB_MODULE_DEF_SECTION, name, 0,
+                              dfl, &out_temp);
+    if (err) {
+        krb5_set_error_message(ctx, err, _("Error reading '%s' attribute: %s"),
+                               name, error_message(err));
         return err;
     }
     *out = out_temp;
@@ -117,8 +147,8 @@ prof_get_string_def(krb5_context ctx, const char *conf_section,
                               KDB_MODULE_SECTION, conf_section, name,
                               0, out);
     if (err) {
-        krb5_set_error_message (ctx, err, "Error reading '%s' attribute: %s",
-                                name, error_message(err));
+        krb5_set_error_message(ctx, err, _("Error reading '%s' attribute: %s"),
+                               name, error_message(err));
         return err;
     }
     if (*out != 0)
@@ -127,8 +157,8 @@ prof_get_string_def(krb5_context ctx, const char *conf_section,
                               KDB_MODULE_DEF_SECTION, name, 0,
                               0, out);
     if (err) {
-        krb5_set_error_message (ctx, err, "Error reading '%s' attribute: %s",
-                                name, error_message(err));
+        krb5_set_error_message(ctx, err, _("Error reading '%s' attribute: %s"),
+                               name, error_message(err));
         return err;
     }
     return 0;
@@ -194,8 +224,8 @@ krb5_ldap_read_server_params(krb5_context context, char *conf_section,
 
     if (ldap_context->max_server_conns < 2) {
         st = EINVAL;
-        krb5_set_error_message (context, st,
-                                "Minimum connections required per server is 2");
+        krb5_set_error_message(context, st, _("Minimum connections required "
+                                              "per server is 2"));
         goto cleanup;
     }
 
@@ -212,7 +242,7 @@ krb5_ldap_read_server_params(krb5_context context, char *conf_section,
         else if (srv_type == KRB5_KDB_SRV_TYPE_ADMIN)
             name = KRB5_CONF_LDAP_KADMIN_DN;
         else if (srv_type == KRB5_KDB_SRV_TYPE_PASSWD)
-            name = "ldap_kpasswdd_dn";
+            name = KRB5_CONF_LDAP_KPASSWDD_DN;
 
         if (name) {
             st = prof_get_string_def (context, conf_section, name,
@@ -269,7 +299,8 @@ krb5_ldap_read_server_params(krb5_context context, char *conf_section,
 
         if ((st=profile_get_string(context->profile, KDB_MODULE_SECTION, conf_section,
                                    KRB5_CONF_LDAP_SERVERS, NULL, &tempval)) != 0) {
-            krb5_set_error_message (context, st, "Error reading 'ldap_servers' attribute");
+            krb5_set_error_message(context, st, _("Error reading "
+                                                  "'ldap_servers' attribute"));
             goto cleanup;
         }
 
@@ -308,6 +339,16 @@ krb5_ldap_read_server_params(krb5_context context, char *conf_section,
             profile_release_string(tempval);
         }
     }
+
+    if ((st = prof_get_boolean_def(context, conf_section,
+                                   KRB5_CONF_DISABLE_LAST_SUCCESS, FALSE,
+                                   &ldap_context->disable_last_success)))
+        goto cleanup;
+
+    if ((st = prof_get_boolean_def(context, conf_section,
+                                   KRB5_CONF_DISABLE_LOCKOUT, FALSE,
+                                   &ldap_context->disable_lockout)))
+        goto cleanup;
 
 cleanup:
     return(st);
@@ -446,12 +487,11 @@ is_principal_in_realm(krb5_ldap_context *ldap_context,
      * portion, then the first portion of the principal name SHOULD be
      * "krbtgt".  All this check is done in the immediate block.
      */
-    if (searchfor->length == 2)
-        if ((strncasecmp(searchfor->data[0].data, "krbtgt",
-                         FIND_MAX(searchfor->data[0].length, strlen("krbtgt"))) == 0) &&
-            (strncasecmp(searchfor->data[1].data, defrealm,
-                         FIND_MAX(searchfor->data[1].length, defrealmlen)) == 0))
+    if (searchfor->length == 2) {
+        if (data_eq_string(searchfor->data[0], "krbtgt") &&
+            data_eq_string(searchfor->data[1], defrealm))
             return 0;
+    }
 
     /* first check the length, if they are not equal, then they are not same */
     if (strlen(defrealm) != searchfor->realm.length)
@@ -1474,14 +1514,6 @@ krb5_add_int_mem_ldap_mod(LDAPMod ***mods, char *attribute, int op, int value)
 }
 
 krb5_error_code
-krb5_ldap_set_option(krb5_context kcontext, int option, void *value)
-{
-    krb5_error_code status = KRB5_PLUGIN_OP_NOTSUPP;
-    krb5_set_error_message(kcontext, status, "LDAP %s", error_message(status));
-    return status;
-}
-
-krb5_error_code
 krb5_ldap_lock(krb5_context kcontext, int mode)
 {
     krb5_error_code status = KRB5_PLUGIN_OP_NOTSUPP;
@@ -1495,34 +1527,6 @@ krb5_ldap_unlock(krb5_context kcontext)
     krb5_error_code status = KRB5_PLUGIN_OP_NOTSUPP;
     krb5_set_error_message(kcontext, status, "LDAP %s", error_message(status));
     return status;
-}
-
-krb5_error_code
-krb5_ldap_supported_realms(krb5_context kcontext, char **realms)
-{
-    krb5_error_code status = KRB5_PLUGIN_OP_NOTSUPP;
-    krb5_set_error_message(kcontext, status, "LDAP %s", error_message(status));
-    return status;
-}
-
-krb5_error_code
-krb5_ldap_free_supported_realms(krb5_context kcontext, char **realms)
-{
-    krb5_error_code status = KRB5_PLUGIN_OP_NOTSUPP;
-    krb5_set_error_message(kcontext, status, "LDAP %s", error_message(status));
-    return status;
-}
-
-const char *
-krb5_ldap_errcode_2_string(krb5_context kcontext, long err_code)
-{
-    return krb5_get_error_message(kcontext, err_code);
-}
-
-void
-krb5_ldap_release_errcode_string(krb5_context kcontext, const char *msg)
-{
-    krb5_free_error_message(kcontext, msg);
 }
 
 
@@ -1659,7 +1663,9 @@ krb5_ldap_policydn_to_name(krb5_context context, char *policy_dn, char **name)
         LDAPDN dn;
         rdn = strndup(policy_dn, len2 - len1 - 1); /* 1 character for ',' */
 
-        if (ldap_str2dn (rdn, &dn, LDAP_DN_FORMAT_LDAPV3 | LDAP_DN_PEDANTIC) != 0) {
+        st = ldap_str2dn(rdn, &dn, LDAP_DN_FORMAT_LDAPV3 | LDAP_DN_PEDANTIC);
+        free(rdn);
+        if (st != 0) {
             st = EINVAL;
             goto cleanup;
         }
@@ -1673,7 +1679,7 @@ krb5_ldap_policydn_to_name(krb5_context context, char *policy_dn, char **name)
                 st = EINVAL;
         }
 
-        ldap_memfree (dn);
+        ldap_dnfree(dn);
     }
 #elif defined HAVE_LDAP_EXPLODE_DN
     {
@@ -1950,18 +1956,14 @@ populate_krb5_db_entry(krb5_context context, krb5_ldap_context *ldap_context,
                                  &attr_present)) != 0)
         goto cleanup;
     if (attr_present == TRUE) {
-        krb5_tl_data  kadm_tl_data;
-
         mask |= KDB_PWD_POL_REF_ATTR;
 
         /* Ensure that the policy is inside the realm container */
         if ((st = krb5_ldap_policydn_to_name (context, pwdpolicydn, &polname)) != 0)
             goto cleanup;
 
-        if ((st = krb5_update_tl_kadm_data(polname, &kadm_tl_data)) != 0) {
+        if ((st = krb5_update_tl_kadm_data(context, entry, polname)) != 0)
             goto cleanup;
-        }
-        krb5_dbe_update_tl_data(context, entry, &kadm_tl_data);
     }
 
     /* KRBSECRETKEY */
@@ -1989,6 +1991,20 @@ populate_krb5_db_entry(krb5_context context, krb5_ldap_context *ldap_context,
                                                     lstpwdchng)))
                 goto cleanup;
             mask |= KDB_LAST_PWD_CHANGE_ATTR;
+        }
+    }
+
+    /* LAST ADMIN UNLOCK */
+    {
+        krb5_timestamp unlock_time=0;
+        if ((st=krb5_ldap_get_time(ld, ent, "krbLastAdminUnlock",
+                                   &unlock_time, &attr_present)) != 0)
+            goto cleanup;
+        if (attr_present == TRUE) {
+            if ((st=krb5_dbe_update_last_admin_unlock(context, entry,
+                                                      unlock_time)))
+                goto cleanup;
+            mask |= KDB_LAST_ADMIN_UNLOCK_ATTR;
         }
     }
 
@@ -2055,7 +2071,10 @@ populate_krb5_db_entry(krb5_context context, krb5_ldap_context *ldap_context,
             for (i = 0; ber_tl_data[i] != NULL; i++) {
                 if ((st = berval2tl_data (ber_tl_data[i] , &ptr)) != 0)
                     break;
-                if ((st = krb5_dbe_update_tl_data(context, entry, ptr)) != 0)
+                st = krb5_dbe_update_tl_data(context, entry, ptr);
+                free(ptr->tl_data_contents);
+                free(ptr);
+                if (st != 0)
                     break;
             }
             ldap_value_free_len (ber_tl_data);
@@ -2082,7 +2101,7 @@ populate_krb5_db_entry(krb5_context context, krb5_ldap_context *ldap_context,
             goto cleanup;
 
         if (attr_present == TRUE) {
-            if ((mask & KDB_PRINC_EXPIRE_TIME_ATTR) == 1) {
+            if (mask & KDB_PRINC_EXPIRE_TIME_ATTR) {
                 if (expiretime < entry->expiration)
                     entry->expiration = expiretime;
             } else {
@@ -2108,22 +2127,21 @@ populate_krb5_db_entry(krb5_context context, krb5_ldap_context *ldap_context,
     /* We already know that the policy is inside the realm container. */
     if (polname) {
         osa_policy_ent_t   pwdpol;
-        int                cnt=0;
         krb5_timestamp     last_pw_changed;
         krb5_ui_4          pw_max_life;
 
         memset(&pwdpol, 0, sizeof(pwdpol));
 
-        if ((st=krb5_ldap_get_password_policy(context, polname, &pwdpol, &cnt)) != 0)
+        if ((st=krb5_ldap_get_password_policy(context, polname, &pwdpol)) != 0)
             goto cleanup;
         pw_max_life = pwdpol->pw_max_life;
-        free (pwdpol);
+        krb5_ldap_free_password_policy(context, pwdpol);
 
         if (pw_max_life > 0) {
             if ((st=krb5_dbe_lookup_last_pwd_change(context, entry, &last_pw_changed)) != 0)
                 goto cleanup;
 
-            if ((mask & KDB_PWD_EXPIRE_TIME_ATTR) == 1) {
+            if (mask & KDB_PWD_EXPIRE_TIME_ATTR) {
                 if ((last_pw_changed + pw_max_life) < entry->pw_expiration)
                     entry->pw_expiration = last_pw_changed + pw_max_life;
             } else

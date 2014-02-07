@@ -49,6 +49,9 @@ krb5kdc \- Kerberos V5 KDC
 ] [
 .B \-n
 ] [
+.B \-w
+.I numworkers
+] [
 .B \-P
 .I pid_file
 ]
@@ -138,6 +141,23 @@ operation, you should always allow the KDC to place itself in
 the background.
 .PP
 The
+.B \-w
+.I numworkers
+option tells the KDC to fork
+.I numworkers
+processes to listen to the KDC ports and process requests in parallel.
+The top level KDC process (whose pid is recorded in the pid file if
+the
+.B \-P
+option is also given) acts as a supervisor.  The supervisor will relay
+SIGHUP signals to the worker subprocesses, and will terminate the
+worker subprocess if the it is itself terminated or if any other
+worker process exits.  NOTE: on operating systems which do not have
+pktinfo support, using worker processes will prevent the KDC from
+listening for UDP packets on network interfaces created after the KDC
+starts.
+.PP
+The
 .B \-P
 .I pid_file
 option tells the KDC to write its PID (followed by a newline) into
@@ -148,7 +168,7 @@ running and to allow init scripts to stop the correct process.
 The KDC may service requests for multiple realms (maximum 32 realms).  The
 realms are listed on the command line.  Per-realm options that can be
 specified on the command line pertain for each realm that follows it and are
-superceded by subsequent definitions of the same option.  For example, 
+superseded by subsequent definitions of the same option.  For example,
 .PP
 .B krb5kdc
 .B \-p

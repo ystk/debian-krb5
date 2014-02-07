@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/asn.1/asn1_k_encode.c */
 /*
- * src/lib/krb5/asn.1/asn1_k_encode.c
- *
  * Copyright 1994, 2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -144,9 +143,23 @@ optional_encrypted_data (const void *vptr)
     return optional;
 }
 
+/*
+ * Encode krb5_kvno as signed 32-bit for Windows RODC interop.  (This is an
+ * inelegant backport; it's an alteration of the expansion of DEFINTTYPE(kvno,
+ * krb5_kvno).)
+ */
+typedef krb5_kvno aux_typedefname_kvno;
+static asn1_intmax loadint_kvno(const void *p)
+{
+    return (krb5_int32)*(krb5_kvno *)p;
+}
+const struct atype_info krb5int_asn1type_kvno = {
+    atype_int, sizeof(krb5_kvno), 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    loadint_kvno, 0,
+};
 static const struct field_info encrypted_data_fields[] = {
     FIELDOF_NORM(krb5_enc_data, int32, enctype, 0),
-    FIELDOF_OPT(krb5_enc_data, uint, kvno, 1, 1),
+    FIELDOF_OPT(krb5_enc_data, kvno, kvno, 1, 1),
     FIELDOF_NORM(krb5_enc_data, ostring_data, ciphertext, 2),
 };
 DEFSEQTYPE(encrypted_data, krb5_enc_data, encrypted_data_fields,
@@ -532,7 +545,6 @@ optional_sam_challenge(const void *p)
 DEFSEQTYPE(sam_challenge,krb5_sam_challenge,sam_challenge_fields,
            optional_sam_challenge);
 
-#if 0 /* encoders not used! */
 MAKE_ENCFN(asn1_encode_sequence_of_checksum, seq_of_checksum);
 static asn1_error_code
 asn1_encode_sam_challenge_2(asn1buf *buf, const krb5_sam_challenge_2 *val,
@@ -595,7 +607,7 @@ optional_sam_challenge_2_body(const void *p)
 }
 DEFSEQTYPE(sam_challenge_2_body,krb5_sam_challenge_2_body,sam_challenge_2_body_fields,
            optional_sam_challenge_2_body);
-#endif
+
 
 static const struct field_info sam_key_fields[] = {
     FIELDOF_NORM(krb5_sam_key, encryption_key, sam_key, 0),
@@ -1394,6 +1406,35 @@ static unsigned int ad_signedpath_optional(const void *p)
 
 DEFSEQTYPE(ad_signedpath, krb5_ad_signedpath, ad_signedpath_fields, ad_signedpath_optional);
 
+static const struct field_info iakerb_header_fields[] = {
+    FIELDOF_NORM(krb5_iakerb_header, ostring_data, target_realm, 1),
+    FIELDOF_OPT(krb5_iakerb_header, ostring_data_ptr, cookie, 2, 2),
+};
+
+static unsigned int iakerb_header_optional(const void *p)
+{
+    unsigned int optional = 0;
+    const krb5_iakerb_header *val = p;
+    if (val->cookie && val->cookie->data)
+        optional |= (1u << 2);
+    return optional;
+}
+
+DEFSEQTYPE(iakerb_header, krb5_iakerb_header, iakerb_header_fields, iakerb_header_optional);
+
+static const struct field_info iakerb_finished_fields[] = {
+    FIELDOF_NORM(krb5_iakerb_finished, checksum, checksum, 1),
+};
+
+static unsigned int iakerb_finished_optional(const void *p)
+{
+    unsigned int optional = 0;
+    return optional;
+}
+
+DEFSEQTYPE(iakerb_finished, krb5_iakerb_finished, iakerb_finished_fields,
+           iakerb_finished_optional);
+
 /* Exported complete encoders -- these produce a krb5_data with
    the encoding in the correct byte order.  */
 
@@ -1442,11 +1483,9 @@ MAKE_FULL_ENCODER(encode_krb5_pwd_data, pwd_data);
 MAKE_FULL_ENCODER(encode_krb5_padata_sequence, seq_of_pa_data);
 /* sam preauth additions */
 MAKE_FULL_ENCODER(encode_krb5_sam_challenge, sam_challenge);
-#if 0 /* encoders not used! */
 MAKE_FULL_ENCODER(encode_krb5_sam_challenge_2, sam_challenge_2);
 MAKE_FULL_ENCODER(encode_krb5_sam_challenge_2_body,
                   sam_challenge_2_body);
-#endif
 MAKE_FULL_ENCODER(encode_krb5_sam_key, sam_key);
 MAKE_FULL_ENCODER(encode_krb5_enc_sam_response_enc,
                   enc_sam_response_enc);
@@ -1472,9 +1511,8 @@ MAKE_FULL_ENCODER(encode_krb5_fast_response, fast_response);
 MAKE_FULL_ENCODER(encode_krb5_ad_kdcissued, ad_kdc_issued);
 MAKE_FULL_ENCODER(encode_krb5_ad_signedpath_data, ad_signedpath_data);
 MAKE_FULL_ENCODER(encode_krb5_ad_signedpath, ad_signedpath);
-
-
-
+MAKE_FULL_ENCODER(encode_krb5_iakerb_header, iakerb_header);
+MAKE_FULL_ENCODER(encode_krb5_iakerb_finished, iakerb_finished);
 
 /*
  * PKINIT
@@ -1596,6 +1634,58 @@ asn1_error_code asn1_encode_krb5_substructure(asn1buf *buf,
     }
 
 #ifndef DISABLE_PKINIT
+
+DEFFNXTYPE(algorithm_identifier, krb5_algorithm_identifier, asn1_encode_algorithm_identifier);
+DEFFNLENTYPE(object_identifier, asn1_octet *, asn1_encode_oid);
+DEFFIELDTYPE(oid_data, krb5_octet_data,
+             FIELDOF_STRING(krb5_octet_data,object_identifier, data, length, -1));
+DEFPTRTYPE(oid_data_ptr, oid_data);
+
+static const struct field_info kdf_alg_id_fields[] = {
+    FIELDOF_ENCODEAS(krb5_octet_data, oid_data, 0)
+};
+DEFSEQTYPE(kdf_alg_id, krb5_octet_data, kdf_alg_id_fields, NULL);
+DEFPTRTYPE(kdf_alg_id_ptr, kdf_alg_id);
+DEFNONEMPTYNULLTERMSEQOFTYPE(supported_kdfs, kdf_alg_id_ptr);
+DEFPTRTYPE(supported_kdfs_ptr, supported_kdfs);
+MAKE_ENCFN(asn1_encode_supported_kdfs,
+           supported_kdfs);
+MAKE_ENCFN(asn1_encode_kdf_alg_id, kdf_alg_id);
+
+
+/* Krb5PrincipalName is defined in RFC 4556 and is *not* PrincipalName from RFC 4120*/
+static const struct field_info pkinit_krb5_principal_name_fields[] = {
+    FIELDOF_NORM(krb5_principal_data, gstring_data, realm, 0),
+    FIELDOF_ENCODEAS(krb5_principal_data, principal_data, 1)
+};
+
+
+DEFSEQTYPE(pkinit_krb5_principal_name_data, krb5_principal_data, pkinit_krb5_principal_name_fields, NULL);
+DEFPTRTYPE(pkinit_krb5_principal_name, pkinit_krb5_principal_name_data);
+DEFOCTETWRAPTYPE(pkinit_krb5_principal_name_wrapped, pkinit_krb5_principal_name);
+
+
+/* For SP80056A OtherInfo, for pkinit agility */
+static const struct field_info sp80056a_other_info_fields[] = {
+    FIELDOF_NORM(krb5_sp80056a_other_info, algorithm_identifier, algorithm_identifier, -1),
+    FIELDOF_NORM(krb5_sp80056a_other_info, pkinit_krb5_principal_name_wrapped, party_u_info, 0),
+    FIELDOF_NORM(krb5_sp80056a_other_info, pkinit_krb5_principal_name_wrapped, party_v_info, 1),
+    FIELDOF_STRING(krb5_sp80056a_other_info, s_octetstring, supp_pub_info.data, supp_pub_info.length, 2),
+};
+
+DEFSEQTYPE(sp80056a_other_info, krb5_sp80056a_other_info, sp80056a_other_info_fields, NULL);
+
+/* For PkinitSuppPubInfo, for pkinit agility */
+static const struct field_info pkinit_supp_pub_info_fields[] = {
+    FIELDOF_NORM(krb5_pkinit_supp_pub_info, int32, enctype, 0),
+    FIELDOF_STRING(krb5_pkinit_supp_pub_info, octetstring, as_req.data, as_req.length, 1),
+    FIELDOF_STRING(krb5_pkinit_supp_pub_info, octetstring, pk_as_rep.data, pk_as_rep.length, 2),
+};
+
+DEFSEQTYPE(pkinit_supp_pub_info, krb5_pkinit_supp_pub_info, pkinit_supp_pub_info_fields, NULL);
+
+MAKE_FULL_ENCODER(encode_krb5_pkinit_supp_pub_info, pkinit_supp_pub_info);
+MAKE_FULL_ENCODER(encode_krb5_sp80056a_other_info, sp80056a_other_info);
 
 /* Callable encoders for the types defined above, until the PKINIT
    encoders get converted.  */
@@ -1744,6 +1834,8 @@ asn1_encode_auth_pack(asn1buf *buf, const krb5_auth_pack *val,
 {
     asn1_setup();
 
+    if (val->supportedKDFs != NULL)
+        asn1_addfield(val->supportedKDFs, 4, asn1_encode_supported_kdfs);
     if (val->clientDHNonce.length != 0)
         asn1_addlenfield(val->clientDHNonce.length, val->clientDHNonce.data, 3, asn1_encode_octetstring);
     if (val->supportedCMSTypes != NULL)
@@ -1906,6 +1998,8 @@ asn1_encode_dh_rep_info(asn1buf *buf, const krb5_dh_rep_info *val,
 {
     asn1_setup();
 
+    if (val->kdfID)
+        asn1_addfield(val->kdfID, 2, asn1_encode_kdf_alg_id);
     if (val->serverDHNonce.length != 0)
         asn1_insert_implicit_octetstring(val->serverDHNonce.length,val->serverDHNonce.data,1);
 
@@ -2027,7 +2121,25 @@ asn1_encode_td_trusted_certifiers(
     asn1_cleanup();
 }
 
-#endif /* DISABLE_PKINIT */
+#else /* DISABLE_PKINIT */
+
+/* Stubs for exported pkinit encoder functions. */
+
+krb5_error_code
+encode_krb5_sp80056a_other_info(const krb5_sp80056a_other_info *rep,
+                                krb5_data **code)
+{
+    return EINVAL;
+}
+
+krb5_error_code
+encode_krb5_pkinit_supp_pub_info(const krb5_pkinit_supp_pub_info *rep,
+                                 krb5_data **code)
+{
+    return EINVAL;
+}
+
+#endif /* not DISABLE_PKINIT */
 
 asn1_error_code
 asn1_encode_sequence_of_typed_data(asn1buf *buf, const krb5_typed_data **val,

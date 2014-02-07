@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/gssapi/krb5/ser_sctx.c - [De]serialization of security context */
 /*
- * lib/gssapi/krb5/ser_sctx.c
- *
  * Copyright 1995, 2004, 2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,12 +22,8 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
  */
 
-/*
- * ser_sctx.c - Handle [de]serialization of GSSAPI security context.
- */
 #include "k5-int.h"
 #include "gssapiP_krb5.h"
 
@@ -357,7 +352,7 @@ kg_ctx_size(kcontext, arg, sizep)
 
             initiator_name = ctx->initiate ? ctx->here : ctx->there;
 
-            if (initiator_name) {
+            if (initiator_name && initiator_name->ad_context) {
                 kret = krb5_size_opaque(kcontext,
                                         KV5M_AUTHDATA_CONTEXT,
                                         initiator_name->ad_context,
@@ -534,7 +529,7 @@ kg_ctx_externalize(kcontext, arg, buffer, lenremain)
 
                 initiator_name = ctx->initiate ? ctx->here : ctx->there;
 
-                if (initiator_name) {
+                if (initiator_name && initiator_name->ad_context) {
                     kret = krb5_externalize_opaque(kcontext,
                                                    KV5M_AUTHDATA_CONTEXT,
                                                    initiator_name->ad_context,
@@ -610,6 +605,7 @@ kg_ctx_internalize(kcontext, argp, buffer, lenremain)
              xmalloc(sizeof(krb5_gss_ctx_id_rec)))) {
             memset(ctx, 0, sizeof(krb5_gss_ctx_id_rec));
 
+            ctx->magic = ibuf;
             ctx->k5_context = kcontext;
 
             /* Get static data */
@@ -668,7 +664,7 @@ kg_ctx_internalize(kcontext, argp, buffer, lenremain)
                                            (krb5_pointer *) &princ,
                                            &bp, &remain);
             if (kret == 0) {
-                kret = kg_init_name(kcontext, princ, NULL,
+                kret = kg_init_name(kcontext, princ, NULL, NULL, NULL,
                                     KG_INIT_NAME_NO_COPY, &ctx->here);
                 if (kret)
                     krb5_free_principal(kcontext, princ);
@@ -680,7 +676,7 @@ kg_ctx_internalize(kcontext, argp, buffer, lenremain)
                                                (krb5_pointer *) &princ,
                                                &bp, &remain);
                 if (kret == 0) {
-                    kret = kg_init_name(kcontext, princ, NULL,
+                    kret = kg_init_name(kcontext, princ, NULL, NULL, NULL,
                                         KG_INIT_NAME_NO_COPY, &ctx->there);
                     if (kret)
                         krb5_free_principal(kcontext, princ);
@@ -774,6 +770,8 @@ kg_ctx_internalize(kcontext, argp, buffer, lenremain)
                                                    (krb5_pointer *)&initiator_name->ad_context,
                                                    &bp,
                                                    &remain);
+                    if (kret == EINVAL)
+                        kret = 0;
                 }
             }
             /* Get trailer */
@@ -794,9 +792,9 @@ kg_ctx_internalize(kcontext, argp, buffer, lenremain)
                 if (ctx->subkey)
                     krb5_k_free_key(kcontext, ctx->subkey);
                 if (ctx->there)
-                    kg_release_name(kcontext, 0, &ctx->there);
+                    kg_release_name(kcontext, &ctx->there);
                 if (ctx->here)
-                    kg_release_name(kcontext, 0, &ctx->here);
+                    kg_release_name(kcontext, &ctx->here);
                 xfree(ctx);
             }
         }

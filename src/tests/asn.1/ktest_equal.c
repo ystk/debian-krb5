@@ -1,4 +1,29 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* tests/asn.1/ktest_equal.c */
+/*
+ * Copyright (C) 1994 by the Massachusetts Institute of Technology.
+ * All rights reserved.
+ *
+ * Export of this software from the United States of America may
+ *   require a specific license from the United States Government.
+ *   It is the responsibility of any person or organization contemplating
+ *   export to obtain such a license before exporting.
+ *
+ * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
+ * distribute this software and its documentation for any purpose and
+ * without fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright notice and
+ * this permission notice appear in supporting documentation, and that
+ * the name of M.I.T. not be used in advertising or publicity pertaining
+ * to distribution of the software without specific, written prior
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is" without express
+ * or implied warranty.
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include "ktest_equal.h"
@@ -597,6 +622,29 @@ int ktest_equal_ad_signedpath(ref, var)
     p=p&&struct_equal(checksum,ktest_equal_checksum);
     p=p&&ptr_equal(delegated,ktest_equal_sequence_of_principal);
     p=p&&ptr_equal(method_data,ktest_equal_sequence_of_pa_data);
+    return p;
+}
+
+int ktest_equal_iakerb_header(ref, var)
+    krb5_iakerb_header *ref;
+    krb5_iakerb_header *var;
+{
+    int p = TRUE;
+    if (ref == var) return TRUE;
+    else if (ref == NULL || var == NULL) return FALSE;
+    p=p&&struct_equal(target_realm,ktest_equal_data);
+    p=p&&ptr_equal(cookie,ktest_equal_data);
+    return p;
+}
+
+int ktest_equal_iakerb_finished(ref, var)
+    krb5_iakerb_finished *ref;
+    krb5_iakerb_finished *var;
+{
+    int p = TRUE;
+    if (ref == var) return TRUE;
+    else if (ref == NULL || var == NULL) return FALSE;
+    p=p&&struct_equal(checksum,ktest_equal_checksum);
     return p;
 }
 

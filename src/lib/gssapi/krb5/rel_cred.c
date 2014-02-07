@@ -23,7 +23,7 @@
 
 #include "gssapiP_krb5.h"
 
-OM_uint32
+OM_uint32 KRB5_CALLCONV
 krb5_gss_release_cred(minor_status, cred_handle)
     OM_uint32 *minor_status;
     gss_cred_id_t *cred_handle;
@@ -44,20 +44,17 @@ krb5_gss_release_cred(minor_status, cred_handle)
         return(GSS_S_COMPLETE);
     }
 
-    if (! kg_delete_cred_id(*cred_handle)) {
-        *minor_status = (OM_uint32) G_VALIDATE_FAILED;
-        krb5_free_context(context);
-        return(GSS_S_CALL_BAD_STRUCTURE|GSS_S_NO_CRED);
-    }
-
     cred = (krb5_gss_cred_id_t)*cred_handle;
 
     k5_mutex_destroy(&cred->lock);
     /* ignore error destroying mutex */
 
-    if (cred->ccache)
-        code1 = krb5_cc_close(context, cred->ccache);
-    else
+    if (cred->ccache) {
+        if (cred->destroy_ccache)
+            code1 = krb5_cc_destroy(context, cred->ccache);
+        else
+            code1 = krb5_cc_close(context, cred->ccache);
+    } else
         code1 = 0;
 
 #ifndef LEAN_CLIENT
@@ -72,10 +69,15 @@ krb5_gss_release_cred(minor_status, cred_handle)
     else
         code3 = 0;
     if (cred->name)
-        kg_release_name(context, 0, &cred->name);
+        kg_release_name(context, &cred->name);
 
     if (cred->req_enctypes)
         free(cred->req_enctypes);
+
+    if (cred->password.data) {
+        zap(cred->password.data, cred->password.length);
+        krb5_free_data_contents(context, &cred->password);
+    }
 
     xfree(cred);
 

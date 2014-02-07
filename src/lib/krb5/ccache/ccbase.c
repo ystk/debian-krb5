@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/ccache/ccbase.c - Registration functions for ccache */
 /*
- * lib/krb5/ccache/ccbase.c
- *
  * Copyright 1990,2004,2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,9 +22,6 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
- * Registration functions for ccache.
  */
 
 #include "k5-int.h"
@@ -78,6 +74,13 @@ static struct krb5_cc_typelist cc_krcc_entry = { &krb5_krcc_ops, NEXT };
 #undef NEXT
 #define NEXT &cc_krcc_entry
 #endif /* USE_KEYRING_CCACHE */
+
+#ifndef _WIN32
+extern const krb5_cc_ops krb5_dcc_ops;
+static struct krb5_cc_typelist cc_dcc_entry = { &krb5_dcc_ops, NEXT };
+#undef NEXT
+#define NEXT &cc_dcc_entry
+#endif /* not _WIN32 */
 
 
 #define INITIAL_TYPEHEAD (NEXT)
@@ -238,6 +241,12 @@ krb5_cc_resolve (krb5_context context, const char *name, krb5_ccache *cache)
     return ops->resolve(context, cache, resid);
 }
 
+krb5_error_code KRB5_CALLCONV
+krb5_cc_dup(krb5_context context, krb5_ccache in, krb5_ccache *out)
+{
+    return in->ops->resolve(context, out, in->ops->get_name(context, in));
+}
+
 /*
  * cc_getops
  *
@@ -289,6 +298,7 @@ krb5_cc_new_unique(
 
     *id = NULL;
 
+    TRACE_CC_NEW_UNIQUE(context, type);
     err = krb5int_cc_getops(context, type, &ops);
     if (err)
         return err;
@@ -367,6 +377,7 @@ krb5_cc_move(krb5_context context, krb5_ccache src, krb5_ccache dst)
     krb5_error_code ret = 0;
     krb5_principal princ = NULL;
 
+    TRACE_CC_MOVE(context, src, dst);
     ret = krb5_cccol_lock(context);
     if (ret) {
         return ret;
@@ -382,9 +393,13 @@ krb5_cc_move(krb5_context context, krb5_ccache src, krb5_ccache dst)
     if (!ret) {
         ret = krb5_cc_initialize(context, dst, princ);
     }
-    if (!ret) {
-        ret = krb5_cc_lock(context, dst);
+    if (ret) {
+        krb5_cc_unlock(context, src);
+        krb5_cccol_unlock(context);
+        return ret;
     }
+
+    ret = krb5_cc_lock(context, dst);
     if (!ret) {
         ret = krb5_cc_copy_creds(context, src, dst);
         krb5_cc_unlock(context, dst);
@@ -401,6 +416,16 @@ krb5_cc_move(krb5_context context, krb5_ccache src, krb5_ccache dst)
     }
 
     return ret;
+}
+
+krb5_boolean KRB5_CALLCONV
+krb5_cc_support_switch(krb5_context context, const char *type)
+{
+    const krb5_cc_ops *ops;
+    krb5_error_code err;
+
+    err = krb5int_cc_getops(context, type, &ops);
+    return (err ? FALSE : (ops->switch_to != NULL));
 }
 
 krb5_error_code

@@ -1,6 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 /*
- * Copyright (C) 2001, 2002, 2004, 2007, 2008 by the Massachusetts Institute of Technology.
+ * Copyright (C) 2001, 2002, 2004, 2007, 2008, 2010 by the Massachusetts Institute of Technology.
  * All rights reserved.
  *
  *
@@ -24,80 +24,7 @@
  * or implied warranty.
  */
 
-#include "k5-int.h"
-#include "enc_provider.h"
-#include <assert.h>
-#include "k5-thread.h"
-
-#include "yarrow.h"
-static Yarrow_CTX y_ctx;
-#define yarrow_lock krb5int_yarrow_lock
-k5_mutex_t yarrow_lock = K5_MUTEX_PARTIAL_INITIALIZER;
-
-/* Helper function to estimate entropy based on sample length
- * and where it comes from.
- */
-
-static size_t
-entropy_estimate(unsigned int randsource, size_t length)
-{
-    switch (randsource) {
-    case KRB5_C_RANDSOURCE_OLDAPI:
-        return 4 * length;
-    case KRB5_C_RANDSOURCE_OSRAND:
-        return 8 * length;
-    case KRB5_C_RANDSOURCE_TRUSTEDPARTY:
-        return 4 * length;
-    case KRB5_C_RANDSOURCE_TIMING:
-        return 2;
-    case KRB5_C_RANDSOURCE_EXTERNAL_PROTOCOL:
-        return 0;
-    default:
-        abort();
-    }
-    return 0;
-}
-
-int krb5int_prng_init(void)
-{
-    unsigned i, source_id;
-    int yerr;
-
-    yerr = k5_mutex_finish_init(&yarrow_lock);
-    if (yerr)
-        return yerr;
-
-    yerr = krb5int_yarrow_init (&y_ctx, NULL);
-    if (yerr != YARROW_OK && yerr != YARROW_NOT_SEEDED)
-        return KRB5_CRYPTO_INTERNAL;
-
-    for (i=0; i < KRB5_C_RANDSOURCE_MAX; i++ ) {
-        if (krb5int_yarrow_new_source(&y_ctx, &source_id) != YARROW_OK)
-            return KRB5_CRYPTO_INTERNAL;
-        assert (source_id == i);
-    }
-
-    return 0;
-}
-
-krb5_error_code KRB5_CALLCONV
-krb5_c_random_add_entropy(krb5_context context, unsigned int randsource,
-                          const krb5_data *data)
-{
-    int yerr;
-
-    /* Make sure the mutex got initialized.  */
-    yerr = krb5int_crypto_init();
-    if (yerr)
-        return yerr;
-    /* Now, finally, feed in the data.  */
-    yerr = krb5int_yarrow_input(&y_ctx, randsource,
-                                data->data, data->length,
-                                entropy_estimate(randsource, data->length));
-    if (yerr != YARROW_OK)
-        return KRB5_CRYPTO_INTERNAL;
-    return 0;
-}
+#include "crypto_int.h"
 
 krb5_error_code KRB5_CALLCONV
 krb5_c_random_seed(krb5_context context, krb5_data *data)
@@ -105,44 +32,40 @@ krb5_c_random_seed(krb5_context context, krb5_data *data)
     return krb5_c_random_add_entropy(context, KRB5_C_RANDSOURCE_OLDAPI, data);
 }
 
-krb5_error_code KRB5_CALLCONV
-krb5_c_random_make_octets(krb5_context context, krb5_data *data)
-{
-    int yerr;
-    yerr = krb5int_yarrow_output(&y_ctx, data->data, data->length);
-    if (yerr == YARROW_NOT_SEEDED) {
-        yerr = krb5int_yarrow_reseed(&y_ctx, YARROW_SLOW_POOL);
-        if (yerr == YARROW_OK)
-            yerr = krb5int_yarrow_output(&y_ctx, data->data, data->length);
-    }
-    if (yerr != YARROW_OK)
-        return KRB5_CRYPTO_INTERNAL;
-    return 0;
-}
-
-void
-krb5int_prng_cleanup (void)
-{
-    krb5int_yarrow_final (&y_ctx);
-    k5_mutex_destroy(&yarrow_lock);
-}
-
-
-/*
- * Routines to get entropy from the OS.  For UNIX we try /dev/urandom
- * and /dev/random.  Currently we don't do anything for Windows.
- */
+/* Routines to get entropy from the OS. */
 #if defined(_WIN32)
+
+krb5_boolean
+k5_get_os_entropy(unsigned char *buf, size_t len)
+{
+    krb5_boolean result;
+    HCRYPTPROV provider;
+
+    if (!CryptAcquireContext(&provider, NULL, NULL, PROV_RSA_FULL,
+                             CRYPT_VERIFYCONTEXT))
+        return FALSE;
+    result = CryptGenRandom(provider, len, buf);
+    (void)CryptReleaseContext(provider, 0);
+    return result;
+}
 
 krb5_error_code KRB5_CALLCONV
 krb5_c_random_os_entropy(krb5_context context, int strong, int *success)
 {
-    if (success)
-        *success = 0;
+    int oursuccess = 0;
+    char buf[1024];
+    krb5_data data = make_data(buf, sizeof(buf));
+
+    if (k5_get_os_entropy(buf, sizeof(buf)) &&
+        krb5_c_random_add_entropy(context, KRB5_C_RANDSOURCE_OSRAND,
+                                  &data) == 0)
+        oursuccess = 1;
+    if (success != NULL)
+        *success = oursuccess;
     return 0;
 }
 
-#else /*Windows*/
+#else /* not Windows */
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -150,44 +73,56 @@ krb5_c_random_os_entropy(krb5_context context, int strong, int *success)
 #include <sys/stat.h>
 #endif
 
-/*
- * Helper function to read entropy from  a random device.  Takes the
- * name of a device, opens it, makes sure it is a device and if so,
- * reads entropy.  Returns  a boolean indicating whether entropy was
- * read.
- */
-
-static int
-read_entropy_from_device(krb5_context context, const char *device)
+/* Open device, ensure that it is not a regular file, and read entropy.  Return
+ * true on success, false on failure. */
+static krb5_boolean
+read_entropy_from_device(const char *device, unsigned char *buf, size_t len)
 {
-    krb5_data data;
     struct stat sb;
     int fd;
-    unsigned char buf[YARROW_SLOW_THRESH/8], *bp;
-    int left;
+    unsigned char *bp;
+    size_t left;
+    ssize_t count;
+    krb5_boolean result = FALSE;
 
-    fd = open (device, O_RDONLY);
+    fd = open(device, O_RDONLY);
     if (fd == -1)
-        return 0;
+        return FALSE;
     set_cloexec_fd(fd);
-    if (fstat(fd, &sb) == -1 || S_ISREG(sb.st_mode)) {
-        close(fd);
-        return 0;
-    }
+    if (fstat(fd, &sb) == -1 || S_ISREG(sb.st_mode))
+        goto cleanup;
 
-    for (bp = buf, left = sizeof(buf); left > 0;) {
-        ssize_t count;
-        count = read(fd, bp, (unsigned) left);
-        if (count <= 0) {
-            close(fd);
-            return 0;
-        }
+    for (bp = buf, left = len; left > 0;) {
+        count = read(fd, bp, left);
+        if (count <= 0)
+            goto cleanup;
         left -= count;
         bp += count;
     }
+    result = TRUE;
+
+cleanup:
     close(fd);
-    data.length = sizeof (buf);
-    data.data = (char *) buf;
+    return result;
+}
+
+krb5_boolean
+k5_get_os_entropy(unsigned char *buf, size_t len)
+{
+    return read_entropy_from_device("/dev/urandom", buf, len);
+}
+
+/* Read entropy from device and contribute it to the PRNG.  Returns true on
+ * success. */
+static krb5_boolean
+add_entropy_from_device(krb5_context context, const char *device)
+{
+    krb5_data data;
+    unsigned char buf[64];
+
+    if (!read_entropy_from_device(device, buf, sizeof(buf)))
+        return FALSE;
+    data = make_data(buf, sizeof(buf));
     return (krb5_c_random_add_entropy(context, KRB5_C_RANDSOURCE_OSRAND,
                                       &data) == 0);
 }
@@ -196,7 +131,7 @@ krb5_error_code KRB5_CALLCONV
 krb5_c_random_os_entropy(krb5_context context, int strong, int *success)
 {
     int unused;
-    int *oursuccess = success ? success : &unused;
+    int *oursuccess = (success != NULL) ? success : &unused;
 
     *oursuccess = 0;
     /* If we are getting strong data then try that first.  We are
@@ -204,12 +139,12 @@ krb5_c_random_os_entropy(krb5_context context, int strong, int *success)
        we have both /dev/random and /dev/urandom.  We want the strong
        data included in the reseed so we get it first.*/
     if (strong) {
-        if (read_entropy_from_device(context, "/dev/random"))
+        if (add_entropy_from_device(context, "/dev/random"))
             *oursuccess = 1;
     }
-    if (read_entropy_from_device(context, "/dev/urandom"))
+    if (add_entropy_from_device(context, "/dev/urandom"))
         *oursuccess = 1;
     return 0;
 }
 
-#endif /*Windows or pre-OSX Mac*/
+#endif /* not Windows */

@@ -1,35 +1,19 @@
-mydir=lib/crypto/openssl/md4
+mydir=lib$(S)crypto$(S)openssl$(S)md4
 BUILDTOP=$(REL)..$(S)..$(S)..$(S)..
-LOCALINCLUDES = -I$(srcdir)
+LOCALINCLUDES =
 DEFS=
 
-##DOS##BUILDTOP = ..\..\..\..
-##DOS##PREFIXDIR=md4
-##DOS##OBJFILE=..\$(OUTPRE)md4.lst
+STLIBOBJS=
 
-PROG_LIBPATH=-L$(TOPLIBD)
-PROG_RPATH=$(KRB5_LIBDIR)
+OBJS=
 
-STLIBOBJS= md4.o
-
-OBJS= $(OUTPRE)md4.$(OBJEXT) 
-
-SRCS= $(srcdir)/md4.c
-
-##DOS##LIBOBJS = $(OBJS)
+SRCS=
 
 all-unix:: all-libobjs
 
 includes:: depend
 
 depend:: $(SRCS)
-
-
-check-unix:: 
-
-check-windows::
-
-clean:: 
 
 clean-unix:: clean-libobjs
 

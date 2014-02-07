@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* slave/kprop.h */
 /*
- * slave/kprop.h
- *
  * Copyright 1990,1991 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,8 +22,6 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
  */
 
 #define KPROP_SERVICE_NAME "host"
@@ -37,3 +34,6 @@
 #define KPROP_BUFSIZ 32768
 
 /* pathnames are in osconf.h, included via k5-int.h */
+
+int sockaddr2krbaddr(krb5_context context, int family, struct sockaddr *sa,
+                     krb5_address **dest);

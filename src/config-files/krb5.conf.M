@@ -18,7 +18,7 @@
 .\" M.I.T. makes no representations about the suitability of
 .\" this software for any purpose.  It is provided "as is" without express
 .\" or implied warranty.
-.\" "
+.\"
 .TH KRB5.CONF 5
 .SH NAME
 krb5.conf \- Kerberos configuration file
@@ -60,6 +60,29 @@ multiple values.  Here is an example of the INI-style format used by
 .sp
 
 .PP
+.I krb5.conf
+can include other files using the directives "include FILENAME" or
+"includedir DIRNAME", which must occur at the beginning of a line.
+FILENAME or DIRNAME should be an absolute path.  The named file or
+directory must exist and be readable.  Including a directory includes
+all files within the directory whose names consist solely of
+alphanumeric characters, dashes, or underscores.  Included profile
+files are syntactically independent of their parents, so each included
+file must begin with a section header.
+
+.PP
+.I krb5.conf
+can cause configuration to be obtained from a loadable profile module
+by placing the directive "module MODULEPATH:RESIDUAL" at the beginning
+of a line before any section headers.  MODULEPATH may be relative to
+the library path of the krb5 installation, or it may be an absolute
+path.  RESIDUAL is provided to the module at initialization time.  If
+.I krb5.conf
+uses a module directive,
+.I kdc.conf
+should also use one if it exists.
+
+.PP
 The following sections are currently used in the 
 .I krb5.conf
 file:
@@ -99,6 +122,9 @@ Contains default values for database specific parameters.
 
 .IP [dbmodules]
 Contains database specific parameters used by the database library.
+
+.IP [plugins]
+Contains plugin module registration and filtering parameters.
 .PP 
 Each of these sections will be covered in more details in the following
 sections.
@@ -141,6 +167,29 @@ This relation sets the maximum allowable amount of clockskew in seconds
 that the library will tolerate before assuming that a Kerberos message
 is invalid.  The default value is 300 seconds, or five minutes.
 
+.IP ignore_acceptor_hostname
+When accepting GSSAPI or krb5 security contexts for host-based service
+principals, ignore any hostname passed by the calling application and
+allow any service principal present in the keytab which matches the
+service name and realm name (if given).  This option can improve the
+administrative flexibility of server applications on multi-homed
+hosts, but can compromise the security of virtual hosting
+environments.  The default value is false.
+
+.IP k5login_authoritative
+If the value of this relation is true (the default), principals must
+be listed in a local user's k5login file to be granted login access,
+if a k5login file exists.  If the value of this relation is false, a
+principal may still be granted login access through other mechanisms
+even if a k5login file exists but does not list the principal.
+
+.IP k5login_directory
+If set, the library will look for a local user's k5login file within
+the named directory, with a filename corresponding to the local
+username.  If not set, the library will look for k5login files in the
+user's home directory, with the filename .k5login.  For security
+reasons, k5login files must be owned by the local user or by root.
+
 .IP kdc_timesync 
 If the value of this relation is non-zero (the default), the library
 will compute the difference between the system clock and the time
@@ -181,7 +230,7 @@ Kerberos. Use a value of 1 on DCE 1.0.3a systems, and a value of 2 on
 DCE 1.1 systems.
 
 .IP dns_lookup_kdc
-Indicate whether DNS SRV records shoud be used to locate the KDCs and 
+Indicate whether DNS SRV records should be used to locate the KDCs and
 other servers for a realm, if they are not listed in the information 
 for the realm.  The default is to use these records.
 
@@ -239,6 +288,18 @@ The default value for this flag is false.
 .IP proxiable
 If this flag is set, initial tickets by default will be proxiable.
 The default value for this flag is false.
+
+.IP rdns
+If set to false, prevent the use of reverse DNS resolution when
+translating hostnames into service principal names.  Defaults to
+true.  Setting this flag to false is more secure, but may force
+users to exclusively use fully qualified domain names when
+authenticating to services.
+
+.IP plugin_base_dir
+If set, determines the base directory where krb5 plugins are located.
+The default value is the "krb5/plugins" subdirectory of the krb5
+library directory.
 
 .SH APPDEFAULTS SECTION
 
@@ -480,7 +541,7 @@ and sent to the device /dev/tty04.
 Cross-realm authentication is typically organized hierarchically.  This
 hierarchy is based on the name of the realm, which thus imposes
 restrictions on the choice of realm names, and on who may participate in
-a cross-realm authentication. A non hierarchical orgization may be used,
+a cross-realm authentication. A non hierarchical organization may be used,
 but requires a database to construct the authentication paths between
 the realms. This section defines that database.
 .PP
@@ -562,11 +623,11 @@ would look like this:
 .sp
 In the above examples, the ordering is not important, except when the
 same subtag name is used more then once. The client will use this to
-determing the path. (It is not important to the server, since the
+determine the path. (It is not important to the server, since the
 transited field is not sorted.)
 .PP
 If this section is not present, or if the client or server cannot find a
-client/server path, then normal hierarchical orginization is assumed.
+client/server path, then normal hierarchical organization is assumed.
 .PP
 This feature is not currently supported by DCE. DCE security servers can
 be used with Kerberized clients and servers, but versions prior to DCE
@@ -626,9 +687,26 @@ define the database specific parameters.
 .PP
 For each section, the following tags may be specified in the subsection:
 
+.IP database_name
+This DB2-specific tag indicates the location of the database in the
+filesystem.
+
 .IP db_library
 This tag indicates the name of the loadable database library.
 The value should be db2 for db2 database and kldap for LDAP database.
+
+.IP disable_last_success
+If set to true, suppresses KDC updates to the "Last successful
+authentication" field of principal entries requiring
+preauthentication.  Setting this flag may improve performance.
+(Principal entries which do not require preauthentication never update
+the "Last successful authentication" field.)
+
+.IP disable_lockout
+If set to true, suppresses KDC updates to the "Last failed
+authentication" and "Failed password attempts" fields of principal
+entries requiring preauthentication.  Setting this flag may improve
+performance, but also disables account lockout.
 
 .IP ldap_kerberos_container_dn 
 This LDAP specific tag indicates the DN of the container object where the realm
@@ -654,6 +732,81 @@ is whitespace-separated. The LDAP server is specified by a LDAP URI.
 .IP ldap_conns_per_server
 This LDAP specific tag indicates the number of connections to be maintained per
 LDAP server.
+
+.SH PLUGINS SECTION
+
+Tags in the [plugins] section can be used to register dynamic plugin
+modules and to turn modules on and off.  Not every krb5 pluggable
+interface uses the [plugins] section; the ones that do are documented
+here.
+
+.PP
+Each pluggable interface corresponds to a subsection of [plugins].
+All subsections support the same tags:
+
+.IP module
+This tag may have multiple values.  Each value is a string of the form
+"modulename:pathname", which causes the shared object located at
+pathname to be registered as a dynamic module named modulename for the
+pluggable interface.  If pathname is not an absolute path, it will be
+treated as relative to the plugin base directory.
+
+.IP enable_only
+This tag may have multiple values.  If there are values for this tag,
+then only the named modules will be enabled for the pluggable
+interface.
+
+.IP disable
+This tag may have multiple values.  If there are values for this tag,
+then the named modules will be disabled for the pluggable interface.
+
+.PP
+The following subsections are currently supported within the [plugins]
+section:
+
+.SS pwqual interface
+
+The pwqual subsection controls modules for the password quality
+interface, which is used to reject weak passwords when passwords are
+changed.  In addition to any registered dynamic modules, the following
+built-in modules exist (and may be disabled with the disable tag):
+
+.IP dict
+Checks against the realm dictionary file
+
+.IP empty
+Rejects empty passwords
+
+.IP hesiod
+Checks against user information stored in Hesiod (only if Kerberos was
+built with Hesiod support)
+
+.IP princ
+Checks against components of the principal name
+
+.SS kadm5_hook interface
+
+The kadm5_hook interface provides plugins with information on
+principal creation, modification, password changes and deletion. This
+interface can be used to write a plugin to synchronize MIT Kerberos
+with another database such as Active Directory. No plugins are built
+in for this interface.
+
+.SS clpreauth and kdcpreauth interfaces
+
+The clpreauth and kdcpreauth interfaces allow plugin modules to
+provide client and KDC preauthentication mechanisms.  The following
+built-in modules exist for these interfaces:
+
+.IP pkinit
+This module implements the PKINIT preauthentication mechanism.
+
+.IP encrypted_challenge
+This module implements the encrypted challenge FAST factor.
+
+.IP encrypted_timestamp
+This module implements the encrypted timestamp mechanism.
+
 .SH FILES 
 /etc/krb5.conf
 .SH SEE ALSO

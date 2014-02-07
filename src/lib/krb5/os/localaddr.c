@@ -1,9 +1,8 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/os/localaddr.c */
 /*
- * lib/krb5/os/localaddr.c
- *
- * Copyright 1990,1991,2000,2001,2002,2004,2007,2008 by the Massachusetts Institute of Technology.
- * All Rights Reserved.
+ * Copyright 1990,1991,2000,2001,2002,2004,2007,2008 by the Massachusetts
+ * Institute of Technology.  All Rights Reserved.
  *
  * Export of this software from the United States of America may
  *   require a specific license from the United States Government.
@@ -23,8 +22,9 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
+ */
+
+/*
  * Return the protocol addresses supported by this host.
  * Exports from this file:
  *   krb5int_foreach_localaddr (does callbacks)
@@ -183,10 +183,12 @@ is_loopback_address(struct sockaddr *sa)
         struct sockaddr_in *s4 = (struct sockaddr_in *)sa;
         return s4->sin_addr.s_addr == htonl(INADDR_LOOPBACK);
     }
+#ifdef KRB5_USE_INET6
     case AF_INET6: {
         struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)sa;
         return IN6_IS_ADDR_LOOPBACK(&s6->sin6_addr);
     }
+#endif
     default:
         return 0;
     }

@@ -1,9 +1,8 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/os/hst_realm.c */
 /*
- * lib/krb5/os/hst_realm.c
- *
- * Copyright 1990,1991,2002,2008,2009 by the Massachusetts Institute of Technology.
- * All Rights Reserved.
+ * Copyright 1990,1991,2002,2008,2009 by the Massachusetts Institute of
+ * Technology.  All Rights Reserved.
  *
  * Export of this software from the United States of America may
  *   require a specific license from the United States Government.
@@ -23,8 +22,13 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
+ */
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  * krb5_get_host_realm()
  * krb5_get_fallback_host_realm()
  * krb5int_clean_hostname()
@@ -103,7 +107,7 @@ get_fq_hostname(char *buf, size_t bufsize, const char *name)
     int err;
 
     memset (&hints, 0, sizeof (hints));
-    hints.ai_flags = AI_CANONNAME;
+    hints.ai_flags = AI_CANONNAME | AI_ADDRCONFIG;
     err = getaddrinfo (name, 0, &hints, &ai);
     if (err)
         return krb5int_translate_gai_error (err);
@@ -371,7 +375,7 @@ krb5_get_fallback_host_realm(krb5_context context,
  * Common code for krb5_get_host_realm and krb5_get_fallback_host_realm
  * to do basic sanity checks on supplied hostname.
  */
-krb5_error_code KRB5_CALLCONV
+krb5_error_code
 krb5int_clean_hostname(krb5_context context,
                        const char *host, char *local_host, size_t lhsize)
 {
@@ -432,11 +436,6 @@ krb5int_clean_hostname(krb5_context context,
 }
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
  * Walk through the components of a domain.  At each stage determine
  * if a KDC can be located for that domain.  Return a realm
  * corresponding to the upper-cased domain name for which a KDC was
@@ -450,7 +449,7 @@ domain_heuristic(krb5_context context, const char *domain,
                  char **realm, int limit)
 {
     krb5_error_code retval = 0, r;
-    struct addrlist alist;
+    struct serverlist slist;
     krb5_data drealm;
     char *cp = NULL, *fqdn, *dot;
 
@@ -479,9 +478,9 @@ domain_heuristic(krb5_context context, const char *domain,
         drealm.data = cp;
 
         /* Find a kdc based on this part of the domain name. */
-        r = krb5_locate_kdc(context, &drealm, &alist, 0, SOCK_DGRAM, 0);
+        r = k5_locate_kdc(context, &drealm, &slist, FALSE, SOCK_DGRAM);
         if (!r) { /* Found a KDC! */
-            krb5int_free_addrlist(&alist);
+            k5_free_serverlist(&slist);
             *realm = strdup(cp);
             if (!*realm) {
                 retval = ENOMEM;

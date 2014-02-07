@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/krb/gc_via_tkt.c */
 /*
- * lib/krb5/krb/gc_via_tgt.c
- *
  * Copyright 1990,1991,2007-2009 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,8 +22,9 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
+ */
+
+/*
  * Given a tkt, and a target cred, get it.
  * Assumes that the kdc_rep has been decrypted.
  */
@@ -55,6 +55,8 @@ kdcrep2creds(krb5_context context, krb5_kdc_rep *pkdcrep, krb5_address *const *a
                                               pkdcrep->enc_part2->session,
                                               &(*ppcreds)->keyblock)))
         goto cleanup;
+    TRACE_TGS_REPLY(context, (*ppcreds)->client, (*ppcreds)->server,
+                    &(*ppcreds)->keyblock);
 
     if ((retval = krb5_copy_data(context, psectkt, &pdata)))
         goto cleanup_keyblock;
@@ -260,7 +262,7 @@ krb5int_process_tgs_reply(krb5_context context,
             switch (err_reply->error) {
             case KRB_ERR_GENERIC:
                 krb5_set_error_message(context, retval,
-                                       "KDC returned error string: %.*s",
+                                       _("KDC returned error string: %.*s"),
                                        err_reply->text.length,
                                        err_reply->text.data);
                 break;
@@ -270,8 +272,8 @@ krb5int_process_tgs_reply(krb5_context context,
                 if (err_reply->server &&
                     krb5_unparse_name(context, err_reply->server, &s_name) == 0) {
                     krb5_set_error_message(context, retval,
-                                           "Server %s not found in Kerberos database",
-                                           s_name);
+                                           _("Server %s not found in Kerberos "
+                                             "database"), s_name);
                     krb5_free_unparsed_name(context, s_name);
                 } else
                     /* In case there's a stale S_PRINCIPAL_UNKNOWN
@@ -295,6 +297,7 @@ krb5int_process_tgs_reply(krb5_context context,
                                     KRB5_KEYUSAGE_TGS_REP_ENCPART_SUBKEY,
                                     &dec_rep);
     if (retval) {
+        TRACE_TGS_REPLY_DECODE_SESSION(context, &tkt->keyblock);
         if ((krb5int_decode_tgs_rep(context, response_data,
                                     &tkt->keyblock,
                                     KRB5_KEYUSAGE_TGS_REP_ENCPART_SESSKEY, &dec_rep)) == 0)

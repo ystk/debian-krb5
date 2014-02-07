@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/kadm5/admin.h */
 /*
- * lib/kadm5/admin.h
- *
  * Copyright 2001, 2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,7 +22,6 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
  */
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
@@ -242,10 +240,6 @@ typedef struct _kadm5_config_params {
        file.  */
     char *             dbname;
 
-    /* dummy fields to preserve abi for now */
-    char *             admin_dbname_was_here;
-    char *             admin_lockfile_was_here;
-
     char *             admin_keytab;
     char *             acl_file;
     char *             dict_file;
@@ -280,7 +274,6 @@ typedef struct _kadm5_config_params {
  */
 typedef struct __krb5_realm_params {
     char *              realm_profile;
-    char *              realm_dbname;
     char *              realm_mkey_name;
     char *              realm_stash_file;
     char *              realm_kdc_ports;
@@ -296,6 +289,7 @@ typedef struct __krb5_realm_params {
     krb5_flags          realm_flags;
     krb5_key_salt_tuple *realm_keysalts;
     unsigned int        realm_reject_bad_transit:1;
+    unsigned int        realm_restrict_anon:1;
     unsigned int        realm_kadmind_port_valid:1;
     unsigned int        realm_enctype_valid:1;
     unsigned int        realm_max_life_valid:1;
@@ -303,6 +297,7 @@ typedef struct __krb5_realm_params {
     unsigned int        realm_expiration_valid:1;
     unsigned int        realm_flags_valid:1;
     unsigned int        realm_reject_bad_transit_valid:1;
+    unsigned int        realm_restrict_anon_valid:1;
     krb5_int32          realm_num_keysalts;
 } krb5_realm_params;
 
@@ -512,6 +507,25 @@ kadm5_ret_t    kadm5_get_principal_keys(void *server_handle,
                                         krb5_principal principal,
                                         krb5_keyblock **keyblocks,
                                         int *n_keys);
+
+
+kadm5_ret_t    kadm5_purgekeys(void *server_handle,
+                               krb5_principal principal,
+                               int keepkvno);
+
+kadm5_ret_t    kadm5_get_strings(void *server_handle,
+                                 krb5_principal principal,
+                                 krb5_string_attr **strings_out,
+                                 int *count_out);
+
+kadm5_ret_t    kadm5_set_string(void *server_handle,
+                                krb5_principal principal,
+                                const char *key,
+                                const char *value);
+
+kadm5_ret_t    kadm5_free_strings(void *server_handle,
+                                  krb5_string_attr *strings,
+                                  int count);
 
 KADM5INT_END_DECLS
 

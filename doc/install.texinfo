@@ -8,7 +8,11 @@
 @setchapternewpage odd                  @c chapter begins on next odd page
 @c @setchapternewpage on                   @c chapter begins on next page
 @c @smallbook                              @c Format for 7" X 9.25" paper
+@documentencoding UTF-8
 @c %**end of header
+@copying
+Copyright @copyright{} 1985-2010 by the Massachusetts Institute of Technology.
+@end copying
 
 @paragraphindent 0
 @iftex
@@ -34,16 +38,17 @@
 
 @page
 @vskip 0pt plus 1filll
-
+@insertcopying
 @end titlepage
 
-@node Top, Copyright, (dir), (dir)
+@node Top, Introduction, (dir), (dir)
 @comment  node-name,  next,  previous,  up
 
 @ifinfo
 This file documents how to install the @value{RELEASE} release of
 @value{PRODUCT}.
 
+@insertcopying
 @end ifinfo
 
 @c The master menu is updated using emacs19's M-x texinfo-all-menus-update
@@ -63,20 +68,16 @@ This file documents how to install the @value{RELEASE} release of
 @c ---------------------------------------------------------------------
 
 @menu
-* Copyright::                   
 * Introduction::                
 * Realm Configuration Decisions::  
 * Building Kerberos V5::        
 * Installing Kerberos V5::      
 * Upgrading Existing Kerberos V5 Installations::  
 * Bug Reports for Kerberos V5::  
+* Copyright::                   
 @end menu
 
-@node Copyright, Introduction, Top, Top
-@unnumbered Copyright
-@include copyright.texinfo
-
-@node Introduction, Realm Configuration Decisions, Copyright, Top
+@node Introduction, Realm Configuration Decisions, Top, Top
 @chapter Introduction
 
 @menu
@@ -962,7 +963,7 @@ With incremental propagation enabled, all programs on the master KDC
 that change the database also write information about the changes to
 an ``update log'' file, maintained as a circular buffer of a certain
 size.  A process on each slave KDC connects to a service on the master
-KDC (currently implmented in the @code{kadmind} server) and
+KDC (currently implemented in the @code{kadmind} server) and
 periodically requests the changes that have been made since the last
 check.  By default, this check is done every two minutes.  If the
 database has just been modified in the previous several seconds
@@ -1033,18 +1034,21 @@ should resume fetching incremental updates.  Thus, all the keytab and
 ACL setup previously described for @code{kprop} propagation is still
 needed.
 
-There are several known bugs and restrictions in the current
-implementation:
+There are several restrictions in the current implementation:
+
 @itemize
 @item
-The ``call out to @code{kprop}'' mechanism is a bit fragile; if the
-@code{kprop} propagation fails to connect for some reason, the process
-on the slave may hang waiting for it, and will need to be restarted.
+Changes to password policy objects are not propagated incrementally.
+Changes to which policy applies to a principal are propagated.
 @item
 The master and slave must be able to initiate TCP connections in both
-directions, without an intervening NAT.  They must also be able to
-communicate over IPv4, since MIT's kprop and RPC code does not
-currently support IPv6.
+directions, without an intervening NAT.
+@item
+If the slave has an IPv6 interface address but needs to accept
+connections over IPv4, the operating system needs ``dual stack'' support
+(i.e. the ability to accept IPv6 and IPv4 connections on a single IPv6
+listener socket).  At this time, all modern Unix-like operating systems
+have dual stack support except OpenBSD.
 @end itemize
 
 @menu
@@ -1411,10 +1415,14 @@ lot of your application servers, and then change the default to include
 triple-DES and RC4.  We recommend that you always include
 @code{des-cbc-crc} in the default list.
 
-@node Bug Reports for Kerberos V5,  , Upgrading Existing Kerberos V5 Installations, Top
+@node Bug Reports for Kerberos V5, Copyright, Upgrading Existing Kerberos V5 Installations, Top
 @chapter Bug Reports for @value{PRODUCT}
 
 @include send-pr.texinfo
+
+@node Copyright,  , Bug Reports for Kerberos V5, Top
+@appendix Copyright
+@include copyright.texinfo
 
 @contents
 @bye

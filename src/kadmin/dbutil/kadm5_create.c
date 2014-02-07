@@ -31,8 +31,6 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include "string_table.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -86,7 +84,8 @@ int kadm5_create(kadm5_config_params *params)
      */
     if ((retval = kadm5_get_config_params(context, 1,
                                           params, &lparams))) {
-        com_err(progname, retval, "while looking up the Kerberos configuration");
+        com_err(progname, retval, _("while looking up the Kerberos "
+                                    "configuration"));
         return 1;
     }
 
@@ -112,7 +111,8 @@ int kadm5_create_magic_princs(kadm5_config_params *params,
                              KADM5_API_VERSION_3,
                              db5util_db_args,
                              &handle))) {
-        com_err(progname, retval, "while initializing the Kerberos admin interface");
+        com_err(progname, retval, _("while initializing the Kerberos admin "
+                                    "interface"));
         return retval;
     }
 
@@ -184,7 +184,7 @@ static int add_admin_princs(void *handle, krb5_context context, char *realm)
         goto clean_and_exit;
     }
     memset(&ai_hints, 0, sizeof(ai_hints));
-    ai_hints.ai_flags = AI_CANONNAME;
+    ai_hints.ai_flags = AI_CANONNAME | AI_ADDRCONFIG;
     gai_error = getaddrinfo(localname, (char *)NULL, &ai_hints, &ai);
     if (gai_error) {
         ret = EINVAL;
@@ -194,9 +194,8 @@ static int add_admin_princs(void *handle, krb5_context context, char *realm)
     }
     if (ai->ai_canonname == NULL) {
         ret = EINVAL;
-        fprintf(stderr,
-                "getaddrinfo(%s): Cannot determine canonical hostname.\n",
-                localname);
+        fprintf(stderr, _("getaddrinfo(%s): Cannot determine canonical "
+                          "hostname.\n"), localname);
         freeaddrinfo(ai);
         goto clean_and_exit;
     }
@@ -216,7 +215,7 @@ static int add_admin_princs(void *handle, krb5_context context, char *realm)
     }
     if (asprintf(&service_name, "kadmin/%s", ai->ai_canonname) < 0) {
         ret = ENOMEM;
-        fprintf(stderr, "Out of memory\n");
+        fprintf(stderr, _("Out of memory\n"));
         freeaddrinfo(ai);
         goto clean_and_exit;
     }
@@ -288,7 +287,7 @@ int add_admin_princ(void *handle, krb5_context context,
     fullname = build_name_with_realm(name, realm);
     ret = krb5_parse_name(context, fullname, &ent.principal);
     if (ret) {
-        com_err(progname, ret, str_PARSE_NAME);
+        com_err(progname, ret, _("while parsing admin principal name"));
         return(ERR);
     }
     ent.max_life = lifetime;
@@ -300,7 +299,7 @@ int add_admin_princ(void *handle, krb5_context context,
                                  "to-be-random");
     if (ret) {
         if (ret != KADM5_DUP) {
-            com_err(progname, ret, str_PUT_PRINC, fullname);
+            com_err(progname, ret, _("while creating principal %s"), fullname);
             krb5_free_principal(context, ent.principal);
             free(fullname);
             return ERR;
@@ -309,7 +308,8 @@ int add_admin_princ(void *handle, krb5_context context,
         /* only randomize key if we created the principal */
         ret = kadm5_randkey_principal(handle, ent.principal, NULL, NULL);
         if (ret) {
-            com_err(progname, ret, str_RANDOM_KEY, fullname);
+            com_err(progname, ret, _("while randomizing principal %s"),
+                    fullname);
             krb5_free_principal(context, ent.principal);
             free(fullname);
             return ERR;
@@ -318,7 +318,8 @@ int add_admin_princ(void *handle, krb5_context context,
         ent.attributes = attrs;
         ret = kadm5_modify_principal(handle, &ent, KADM5_ATTRIBUTES);
         if (ret) {
-            com_err(progname, ret, str_PUT_PRINC, fullname);
+            com_err(progname, ret, _("while setting attributes on %s"),
+                    fullname);
             krb5_free_principal(context, ent.principal);
             free(fullname);
             return ERR;

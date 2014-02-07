@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/os/sn2princ.c */
 /*
- * lib/krb5/os/sn2princ.c
- *
  * Copyright 1991,2002 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,11 +22,10 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
- * Convert a hostname and service name to a principal in the "standard"
- * form.
  */
+
+/* Convert a hostname and service name to a principal in the "standard"
+ * form. */
 
 #include "k5-int.h"
 #include "os-proto.h"
@@ -92,7 +90,7 @@ krb5_sname_to_principal(krb5_context context, const char *hostname, const char *
         /* copy the hostname into non-volatile storage */
 
         if (type == KRB5_NT_SRV_HST) {
-            struct addrinfo *ai, hints;
+            struct addrinfo *ai = NULL, hints;
             int err;
             char hnamebuf[NI_MAXHOST];
 
@@ -107,28 +105,21 @@ krb5_sname_to_principal(krb5_context context, const char *hostname, const char *
                hostnames associated.  */
 
             memset(&hints, 0, sizeof(hints));
-            hints.ai_family = AF_INET;
-            hints.ai_flags = AI_CANONNAME;
-        try_getaddrinfo_again:
+            hints.ai_flags = AI_CANONNAME | AI_ADDRCONFIG;
             err = getaddrinfo(hostname, 0, &hints, &ai);
             if (err) {
 #ifdef DEBUG_REFERRALS
-                printf("sname_to_princ: probably punting due to bad hostname of %s\n",hostname);
+                printf("sname_to_princ: failed to canonicalize %s; using as-is", hostname);
 #endif
-                if (hints.ai_family == AF_INET) {
-                    /* Just in case it's an IPv6-only name.  */
-                    hints.ai_family = 0;
-                    goto try_getaddrinfo_again;
-                }
-                return KRB5_ERR_BAD_HOSTNAME;
             }
-            remote_host = strdup(ai->ai_canonname ? ai->ai_canonname : hostname);
+            remote_host = strdup((ai && ai->ai_canonname) ? ai->ai_canonname : hostname);
             if (!remote_host) {
-                freeaddrinfo(ai);
+                if(ai)
+                    freeaddrinfo(ai);
                 return ENOMEM;
             }
 
-            if (maybe_use_reverse_dns(context, DEFAULT_RDNS_LOOKUP)) {
+            if ((!err) && maybe_use_reverse_dns(context, DEFAULT_RDNS_LOOKUP)) {
                 /*
                  * Do a reverse resolution to get the full name, just in
                  * case there's some funny business going on.  If there
@@ -196,8 +187,8 @@ krb5_sname_to_principal(krb5_context context, const char *hostname, const char *
         retval = krb5_build_principal(context, ret_princ, strlen(realm),
                                       realm, sname, remote_host,
                                       (char *)0);
-
-        krb5_princ_type(context, *ret_princ) = type;
+        if (retval == 0)
+            krb5_princ_type(context, *ret_princ) = type;
 
 #ifdef DEBUG_REFERRALS
         printf("krb5_sname_to_principal returning\n");

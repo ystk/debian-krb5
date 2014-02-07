@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/crypto/crypto_tests/t_short.c */
 /*
- * lib/crypto/crypto_tests/t_short.c
- *
  * Copyright (C) 2009 by the Massachusetts Institute of Technology.
  * All rights reserved.
  *
@@ -23,7 +22,9 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ */
+
+/*
  * Tests the outcome of decrypting overly short tokens.  This program can be
  * run under a tool like valgrind to detect bad memory accesses; when run
  * normally by the test suite, it verifies that each operation returns
@@ -41,6 +42,10 @@ krb5_enctype interesting_enctypes[] = {
     ENCTYPE_ARCFOUR_HMAC_EXP,
     ENCTYPE_AES256_CTS_HMAC_SHA1_96,
     ENCTYPE_AES128_CTS_HMAC_SHA1_96,
+#ifdef CAMELLIA
+    ENCTYPE_CAMELLIA128_CTS_CMAC,
+    ENCTYPE_CAMELLIA256_CTS_CMAC,
+#endif
     0
 };
 
@@ -109,6 +114,8 @@ test_enctype(krb5_enctype enctype)
         free(input.ciphertext.data);
         free(output.data);
     }
+    krb5int_c_free_keyblock_contents (NULL, &keyblock);
+
 }
 
 int

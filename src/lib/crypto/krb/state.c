@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/crypto/krb/state.c */
 /*
- * lib/crypto/state.c
- *
  * Copyright (C) 2001 by the Massachusetts Institute of Technology.
  * All rights reserved.
  *
@@ -33,8 +32,7 @@
  * krb5_c_init_state and krb5_c_free_state used by clients of the
  * Kerberos crypto library.
  */
-#include "k5-int.h"
-#include "etypes.h"
+#include "crypto_int.h"
 
 krb5_error_code KRB5_CALLCONV
 krb5_c_init_state (krb5_context context, const krb5_keyblock *key,
@@ -57,5 +55,6 @@ krb5_c_free_state(krb5_context context, const krb5_keyblock *key,
     ktp = find_enctype(key->enctype);
     if (ktp == NULL)
         return KRB5_BAD_ENCTYPE;
-    return ktp->enc->free_state(state);
+    ktp->enc->free_state(state);
+    return 0;
 }

@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* kdc/policy.c - Policy decision routines for KDC */
 /*
- * kdc/policy.c
- *
  * Copyright 1990 by the Massachusetts Institute of Technology.
  *
  * Export of this software from the United States of America may
@@ -22,9 +21,6 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
- * Policy decision routines for KDC.
  */
 /*
  * Copyright (c) 2006-2008, Novell, Inc.
@@ -61,14 +57,8 @@
 int
 against_local_policy_as(register krb5_kdc_req *request, krb5_db_entry client,
                         krb5_db_entry server, krb5_timestamp kdc_time,
-                        const char **status, krb5_data *e_data)
+                        const char **status, krb5_pa_data ***e_data)
 {
-    krb5_error_code             code;
-    kdb_check_policy_as_req     req;
-    kdb_check_policy_as_rep     rep;
-    krb5_data                   req_data;
-    krb5_data                   rep_data;
-
 #if 0
     /* An AS request must include the addresses field */
     if (request->addresses == 0) {
@@ -77,37 +67,7 @@ against_local_policy_as(register krb5_kdc_req *request, krb5_db_entry client,
     }
 #endif
 
-    memset(&req, 0, sizeof(req));
-    memset(&rep, 0, sizeof(rep));
-
-    req.request                 = request;
-    req.client                  = &client;
-    req.server                  = &server;
-    req.kdc_time                = kdc_time;
-
-    req_data.data = (void *)&req;
-    req_data.length = sizeof(req);
-
-    rep_data.data = (void *)&rep;
-    rep_data.length = sizeof(rep);
-
-    code = krb5_db_invoke(kdc_context,
-                          KRB5_KDB_METHOD_CHECK_POLICY_AS,
-                          &req_data,
-                          &rep_data);
-    if (code == KRB5_KDB_DBTYPE_NOSUP)
-        return 0;
-
-    *status = rep.status;
-    *e_data = rep.e_data;
-
-    if (code != 0) {
-        code -= ERROR_TABLE_BASE_krb5;
-        if (code < 0 || code > 128)
-            code = KRB_ERR_GENERIC;
-    }
-
-    return code;
+    return 0;                   /* not against policy */
 }
 
 /*
@@ -116,14 +76,8 @@ against_local_policy_as(register krb5_kdc_req *request, krb5_db_entry client,
 krb5_error_code
 against_local_policy_tgs(register krb5_kdc_req *request, krb5_db_entry server,
                          krb5_ticket *ticket, const char **status,
-                         krb5_data *e_data)
+                         krb5_pa_data ***e_data)
 {
-    krb5_error_code             code;
-    kdb_check_policy_tgs_req    req;
-    kdb_check_policy_tgs_rep    rep;
-    krb5_data                   req_data;
-    krb5_data                   rep_data;
-
 #if 0
     /*
      * For example, if your site wants to disallow ticket forwarding,
@@ -136,34 +90,5 @@ against_local_policy_tgs(register krb5_kdc_req *request, krb5_db_entry server,
     }
 #endif
 
-    memset(&req, 0, sizeof(req));
-    memset(&rep, 0, sizeof(rep));
-
-    req.request                 = request;
-    req.server                  = &server;
-    req.ticket                  = ticket;
-
-    req_data.data = (void *)&req;
-    req_data.length = sizeof(req);
-
-    rep_data.data = (void *)&rep;
-    rep_data.length = sizeof(rep);
-
-    code = krb5_db_invoke(kdc_context,
-                          KRB5_KDB_METHOD_CHECK_POLICY_TGS,
-                          &req_data,
-                          &rep_data);
-    if (code == KRB5_KDB_DBTYPE_NOSUP)
-        return 0;
-
-    *status = rep.status;
-    *e_data = rep.e_data;
-
-    if (code != 0) {
-        code -= ERROR_TABLE_BASE_krb5;
-        if (code < 0 || code > 128)
-            code = KRB_ERR_GENERIC;
-    }
-
-    return code;
+    return 0;                           /* not against policy */
 }

@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/crypto/krb/make_checksum_iov.c */
 /*
- * lib/crypto/make_checksum_iov.c
- *
  * Copyright 2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -25,9 +24,7 @@
  * or implied warranty.
  */
 
-#include "k5-int.h"
-#include "cksumtypes.h"
-#include "aead.h"
+#include "crypto_int.h"
 
 krb5_error_code KRB5_CALLCONV
 krb5_k_make_checksum_iov(krb5_context context,
@@ -42,6 +39,12 @@ krb5_k_make_checksum_iov(krb5_context context,
     krb5_crypto_iov *checksum;
     const struct krb5_cksumtypes *ctp;
 
+    if (cksumtype == 0) {
+        ret = krb5int_c_mandatory_cksumtype(context, key->keyblock.enctype,
+                                            &cksumtype);
+        if (ret != 0)
+            return ret;
+    }
     ctp = find_cksumtype(cksumtype);
     if (ctp == NULL)
         return KRB5_BAD_ENCTYPE;

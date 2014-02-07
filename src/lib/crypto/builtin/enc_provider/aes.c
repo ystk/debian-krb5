@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/crypto/builtin/enc_provider/aes.c */
 /*
- * lib/crypto/enc_provider/aes.c
- *
  * Copyright (C) 2003, 2007, 2008 by the Massachusetts Institute of Technology.
  * All rights reserved.
  *
@@ -25,11 +24,8 @@
  * or implied warranty.
  */
 
-#include "k5-int.h"
-#include "enc_provider.h"
+#include "crypto_int.h"
 #include "aes.h"
-#include <aead.h>
-#include <rand2key.h>
 
 #define CHECK_SIZES 0
 
@@ -65,7 +61,7 @@ xorblock(unsigned char *out, const unsigned char *in)
     int z;
     for (z = 0; z < BLOCK_SIZE/4; z++) {
         unsigned char *outptr = &out[z*4];
-        unsigned char *inptr = &in[z*4];
+        const unsigned char *inptr = &in[z*4];
         /*
          * Use unaligned accesses.  On x86, this will probably still be faster
          * than multiple byte accesses for unaligned data, and for aligned data
@@ -132,12 +128,12 @@ krb5int_aes_encrypt(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
         for (blockno = 0; blockno < nblocks - 2; blockno++) {
             unsigned char blockN[BLOCK_SIZE], *block;
 
-            block = iov_next_block(blockN, BLOCK_SIZE, data, num_data,
-                                   &input_pos);
+            krb5int_c_iov_get_block_nocopy(blockN, BLOCK_SIZE,
+                                           data, num_data, &input_pos, &block);
             xorblock(tmp, block);
             enc(block, tmp, &CACHE(key)->enc_ctx);
-            iov_store_block(data, num_data, block, blockN, BLOCK_SIZE,
-                            &output_pos);
+            krb5int_c_iov_put_block_nocopy(data, num_data, blockN, BLOCK_SIZE,
+                                           &output_pos, block);
 
             /* Set up for next block.  */
             memcpy(tmp, block, BLOCK_SIZE);
@@ -228,14 +224,14 @@ krb5int_aes_decrypt(krb5_key key, const krb5_data *ivec, krb5_crypto_iov *data,
         for (blockno = 0; blockno < nblocks - 2; blockno++) {
             unsigned char blockN[BLOCK_SIZE], *block;
 
-            block = iov_next_block(blockN, BLOCK_SIZE, data, num_data,
-                                   &input_pos);
+            krb5int_c_iov_get_block_nocopy(blockN, BLOCK_SIZE,
+                                           data, num_data, &input_pos, &block);
             memcpy(tmp2, block, BLOCK_SIZE);
             dec(block, block, &CACHE(key)->dec_ctx);
             xorblock(block, tmp);
             memcpy(tmp, tmp2, BLOCK_SIZE);
-            iov_store_block(data, num_data, block, blockN, BLOCK_SIZE,
-                            &output_pos);
+            krb5int_c_iov_put_block_nocopy(data, num_data, blockN, BLOCK_SIZE,
+                                           &output_pos, block);
         }
 
         /* Do last two blocks, the second of which (next-to-last block
@@ -300,7 +296,6 @@ const struct krb5_enc_provider krb5int_enc_aes128 = {
     krb5int_aes_encrypt,
     krb5int_aes_decrypt,
     NULL,
-    krb5int_aes_make_key,
     aes_init_state,
     krb5int_default_free_state,
     aes_key_cleanup
@@ -312,7 +307,6 @@ const struct krb5_enc_provider krb5int_enc_aes256 = {
     krb5int_aes_encrypt,
     krb5int_aes_decrypt,
     NULL,
-    krb5int_aes_make_key,
     aes_init_state,
     krb5int_default_free_state,
     aes_key_cleanup

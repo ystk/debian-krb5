@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* tests/create/kdb5_mkdums.c */
 /*
- * tests/create/kdb5_mkdums.c
- *
  * Copyright 1990,1991 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,7 +22,9 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ */
+
+/*
  *
  * Edit a KDC database.
  */
@@ -70,7 +71,6 @@ usage(who, status)
 int master_princ_set = 0;
 krb5_keyblock master_keyblock;
 krb5_principal master_princ;
-krb5_db_entry master_entry;
 krb5_pointer master_random;
 krb5_context test_context;
 
@@ -97,7 +97,7 @@ main(argc, argv)
     int num_to_create;
     char principal_string[BUFSIZ];
     char *suffix = 0;
-    size_t suffix_size;
+    size_t suffix_size = 0;
     int depth;
 
     krb5_init_context(&test_context);
@@ -202,9 +202,8 @@ main(argc, argv)
         com_err(progname, retval, "while closing database");
         exit(1);
     }
-    if (master_princ_set) {
+    if (master_princ_set)
         krb5_free_principal(test_context, master_princ);
-    }
     krb5_free_context(test_context);
     exit(0);
 }
@@ -216,10 +215,15 @@ add_princ(context, str_newprinc)
 {
     krb5_error_code       retval;
     krb5_principal        newprinc;
-    krb5_db_entry         newentry;
+    krb5_db_entry         *newentry;
     char                  princ_name[4096];
 
-    memset(&newentry, 0, sizeof(newentry));
+    newentry = krb5_db_alloc(context, NULL, sizeof(*newentry));
+    if (newentry == NULL) {
+        com_err(progname, ENOMEM, "while allocating DB entry");
+        return;
+    }
+    memset(newentry, 0, sizeof(*newentry));
     snprintf(princ_name, sizeof(princ_name), "%s@%s", str_newprinc, cur_realm);
     if ((retval = krb5_parse_name(context, princ_name, &newprinc))) {
         com_err(progname, retval, "while parsing '%s'", princ_name);
@@ -227,15 +231,15 @@ add_princ(context, str_newprinc)
     }
 
     /* Add basic data */
-    newentry.len = KRB5_KDB_V1_BASE_LENGTH;
-    newentry.attributes = mblock.flags;
-    newentry.max_life = mblock.max_life;
-    newentry.max_renewable_life = mblock.max_rlife;
-    newentry.expiration = mblock.expiration;
-    newentry.pw_expiration = mblock.expiration;
+    newentry->len = KRB5_KDB_V1_BASE_LENGTH;
+    newentry->attributes = mblock.flags;
+    newentry->max_life = mblock.max_life;
+    newentry->max_renewable_life = mblock.max_rlife;
+    newentry->expiration = mblock.expiration;
+    newentry->pw_expiration = mblock.expiration;
 
     /* Add princ to db entry */
-    if ((retval = krb5_copy_principal(context, newprinc, &newentry.princ))) {
+    if ((retval = krb5_copy_principal(context, newprinc, &newentry->princ))) {
         com_err(progname, retval, "while encoding princ to db entry for '%s'",
                 princ_name);
         krb5_free_principal(context, newprinc);
@@ -252,7 +256,7 @@ add_princ(context, str_newprinc)
             krb5_free_principal(context, newprinc);
             goto error;
         }
-        retval = krb5_dbe_update_mod_princ_data(context, &newentry, now,
+        retval = krb5_dbe_update_mod_princ_data(context, newentry, now,
                                                 master_princ);
         if (retval) {
             com_err(progname, retval, "while encoding mod_princ data");
@@ -285,16 +289,16 @@ add_princ(context, str_newprinc)
         }
         krb5_free_data_contents(context, &salt);
 
-        if ((retval = krb5_dbe_create_key_data(context, &newentry))) {
+        if ((retval = krb5_dbe_create_key_data(context, newentry))) {
             com_err(progname, retval, "while creating key_data for '%s'",
                     princ_name);
             free(key.contents);
             goto error;
         }
 
-        if ((retval = krb5_dbekd_encrypt_key_data(context,&master_keyblock,
-                                                  &key, NULL, 1,
-                                                  newentry.key_data))) {
+        if ((retval = krb5_dbe_encrypt_key_data(context, &master_keyblock,
+                                                &key, NULL, 1,
+                                                newentry->key_data))) {
             com_err(progname, retval, "while encrypting key for '%s'",
                     princ_name);
             free(key.contents);
@@ -303,26 +307,15 @@ add_princ(context, str_newprinc)
         free(key.contents);
     }
 
-    {
-        int one = 1;
-
-        if ((retval = krb5_db_put_principal(context, &newentry, &one))) {
-            com_err(progname, retval, "while storing principal date");
-            goto error;
-        }
-        if (one != 1) {
-            com_err(progname,0,"entry not stored in database (unknown failure)");
-            goto error;
-        }
+    if ((retval = krb5_db_put_principal(context, newentry))) {
+        com_err(progname, retval, "while storing principal date");
+        goto error;
     }
 
     fprintf(stdout, "Added %s to database\n", princ_name);
 
 error: /* Do cleanup of newentry regardless of error */
-#if 0
-    krb5_dbe_free_contents(context, &newentry);
-#endif
-    krb5_db_free_principal(context, &newentry, 1);
+    krb5_db_free_principal(context, newentry);
     return;
 }
 
@@ -332,10 +325,10 @@ set_dbname_help(pname, dbname)
     char *dbname;
 {
     krb5_error_code retval;
-    int nentries;
-    krb5_boolean more;
     krb5_data pwd, scratch;
     char *args[2];
+    krb5_keylist_node *mkeys;
+    krb5_db_entry *master_entry;
 
     /* assemble & parse the master key name */
 
@@ -392,36 +385,28 @@ set_dbname_help(pname, dbname)
     /* Done with args */
     free(args[0]);
 
-    if ((retval = krb5_db_verify_master_key(test_context, master_princ,
-                                            IGNORE_VNO, &master_keyblock))){
+    if ((retval = krb5_db_fetch_mkey_list(test_context, master_princ,
+                                          &master_keyblock, IGNORE_VNO,
+                                          &mkeys))){
         com_err(pname, retval, "while verifying master key");
         (void) krb5_db_fini(test_context);
         return(1);
     }
-    nentries = 1;
-    if ((retval = krb5_db_get_principal(test_context, master_princ,
-                                        &master_entry, &nentries, &more))) {
+    krb5_db_free_mkey_list(test_context, mkeys);
+    if ((retval = krb5_db_get_principal(test_context, master_princ, 0,
+                                        &master_entry))) {
         com_err(pname, retval, "while retrieving master entry");
-        (void) krb5_db_fini(test_context);
-        return(1);
-    } else if (more) {
-        com_err(pname, KRB5KDC_ERR_PRINCIPAL_NOT_UNIQUE,
-                "while retrieving master entry");
-        (void) krb5_db_fini(test_context);
-        return(1);
-    } else if (!nentries) {
-        com_err(pname, KRB5_KDB_NOENTRY, "while retrieving master entry");
         (void) krb5_db_fini(test_context);
         return(1);
     }
 
-    mblock.max_life = master_entry.max_life;
-    mblock.max_rlife = master_entry.max_renewable_life;
-    mblock.expiration = master_entry.expiration;
+    mblock.max_life = master_entry->max_life;
+    mblock.max_rlife = master_entry->max_renewable_life;
+    mblock.expiration = master_entry->expiration;
 
     /* don't set flags, master has some extra restrictions */
-    mblock.mkvno = master_entry.key_data[0].key_data_kvno;
+    mblock.mkvno = master_entry->key_data[0].key_data_kvno;
 
-    krb5_db_free_principal(test_context, &master_entry, nentries);
+    krb5_db_free_principal(test_context, master_entry);
     return 0;
 }

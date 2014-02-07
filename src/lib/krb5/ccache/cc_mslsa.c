@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/ccache/cc_mslsa.c */
 /*
- * lib/krb5/ccache/cc_mslsa.c
- *
  * Copyright 2007 Secure Endpoints Inc.
  *
  * Copyright 2003,2004 by the Massachusetts Institute of Technology.
@@ -669,7 +668,7 @@ does_retrieve_ticket_cache_ticket (void)
 
         pTicketRequest = (PKERB_RETRIEVE_TKT_REQUEST) LocalAlloc(LMEM_ZEROINIT, RequestSize);
         if (!pTicketRequest) {
-            CloseHandle(LogonHandle);
+            LsaDeregisterLogonProcess(LogonHandle);
             return FALSE;
         }
 
@@ -694,7 +693,7 @@ does_retrieve_ticket_cache_ticket (void)
         );
 
         LocalFree(pTicketRequest);
-        CloseHandle(LogonHandle);
+        LsaDeregisterLogonProcess(LogonHandle);
 
         if (FAILED(Status) || FAILED(SubStatus)) {
             if ( SubStatus == STATUS_NOT_SUPPORTED )
@@ -734,7 +733,7 @@ does_query_ticket_cache_ex2 (void)
 
         pCacheRequest = (PKERB_QUERY_TKT_CACHE_REQUEST) LocalAlloc(LMEM_ZEROINIT, RequestSize);
         if (!pCacheRequest) {
-            CloseHandle(LogonHandle);
+            LsaDeregisterLogonProcess(LogonHandle);
             return FALSE;
         }
 
@@ -752,7 +751,7 @@ does_query_ticket_cache_ex2 (void)
         );
 
         LocalFree(pCacheRequest);
-        CloseHandle(LogonHandle);
+        LsaDeregisterLogonProcess(LogonHandle);
 
         if (!(FAILED(Status) || FAILED(SubStatus))) {
             LsaFreeReturnBuffer(pCacheResponse);
@@ -2049,7 +2048,7 @@ krb5_lcc_resolve (krb5_context context, krb5_ccache *id, const char *residual)
 
     lid = (krb5_ccache) malloc(sizeof(struct _krb5_ccache));
     if (lid == NULL) {
-        CloseHandle(LogonHandle);
+        LsaDeregisterLogonProcess(LogonHandle);
         return KRB5_CC_NOMEM;
     }
 
@@ -2058,7 +2057,7 @@ krb5_lcc_resolve (krb5_context context, krb5_ccache *id, const char *residual)
     lid->data = (krb5_pointer) malloc(sizeof(krb5_lcc_data));
     if (lid->data == NULL) {
         free(lid);
-        CloseHandle(LogonHandle);
+        LsaDeregisterLogonProcess(LogonHandle);
         return KRB5_CC_NOMEM;
     }
 
@@ -2072,7 +2071,7 @@ krb5_lcc_resolve (krb5_context context, krb5_ccache *id, const char *residual)
     if (data->cc_name == NULL) {
         free(lid->data);
         free(lid);
-        CloseHandle(LogonHandle);
+        LsaDeregisterLogonProcess(LogonHandle);
         return KRB5_CC_NOMEM;
     }
     strcpy(data->cc_name, residual);
@@ -2094,7 +2093,7 @@ krb5_lcc_resolve (krb5_context context, krb5_ccache *id, const char *residual)
         free(data->cc_name);
         free(lid->data);
         free(lid);
-        CloseHandle(LogonHandle);
+        LsaDeregisterLogonProcess(LogonHandle);
         return KRB5_FCC_NOFILE;
     }
 
@@ -2169,7 +2168,7 @@ krb5_lcc_close(krb5_context context, krb5_ccache id)
         data = (krb5_lcc_data *) id->data;
 
         if (data) {
-            CloseHandle(data->LogonHandle);
+            LsaDeregisterLogonProcess(data->LogonHandle);
             free(data);
         }
         free(id);
@@ -2649,6 +2648,15 @@ krb5_lcc_store(krb5_context context, krb5_ccache id, krb5_creds *creds)
     if (!is_windows_2000())
         return KRB5_FCC_NOFILE;
 
+    if (krb5_is_config_principal(context, creds->server)) {
+        /* mslsa cannot store config creds, so we have to bail.
+         * The 'right' thing to do would be to return an appropriate error,
+         * but that would require modifying the calling code to check
+         * for that error and ignore it.
+         */
+        return KRB5_OK;
+    }
+
 #ifdef KERB_SUBMIT_TICKET
     /* we can use the new KerbSubmitTicketMessage to store the ticket */
     if (KerbSubmitTicket( data->LogonHandle, data->PackageId, context, creds ))
@@ -2753,6 +2761,7 @@ const krb5_cc_ops krb5_lcc_ops = {
     krb5_lcc_remove_cred,
     krb5_lcc_set_flags,
     krb5_lcc_get_flags,
+    NULL,
     NULL,
     NULL,
     NULL,

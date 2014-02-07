@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/os/dnsglue.c */
 /*
- * lib/krb5/os/dnsglue.c
- *
  * Copyright 2004, 2009 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,8 +22,8 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
  */
+
 #include "autoconf.h"
 #ifdef KRB5_DNS_LOOKUP
 
@@ -185,8 +184,8 @@ krb5int_dns_nextans(struct krb5int_dns_state *ds,
         if (len < 0)
             return -1;
         ds->cur_ans++;
-        if (ds->nclass == ns_rr_class(rr)
-            && ds->ntype == ns_rr_type(rr)) {
+        if (ds->nclass == (int)ns_rr_class(rr)
+            && ds->ntype == (int)ns_rr_type(rr)) {
             *pp = ns_rr_rdata(rr);
             *lenp = ns_rr_rdlen(rr);
             return 0;

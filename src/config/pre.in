@@ -156,9 +156,11 @@ FAKELIBDIR=$(FAKEPREFIX)/lib
 #		don't pull the pthreads library into shared libraries
 ALL_CFLAGS = $(DEFS) $(DEFINES) $(KRB_INCLUDES) $(LOCALINCLUDES) \
 	-DKRB5_DEPRECATED=1 \
+	-DKRB5_PRIVATE \
 	$(CPPFLAGS) $(CFLAGS) $(WARN_CFLAGS) $(PTHREAD_CFLAGS)
 ALL_CXXFLAGS = $(DEFS) $(DEFINES) $(KRB_INCLUDES) $(LOCALINCLUDES) \
 	-DKRB5_DEPRECATED=1 \
+	-DKRB5_PRIVATE \
 	$(CPPFLAGS) $(CXXFLAGS) $(WARN_CXXFLAGS) $(PTHREAD_CFLAGS)
 
 CFLAGS = @CFLAGS@
@@ -216,6 +218,7 @@ KRB5_DB_MODULE_DIR = $(MODULE_DIR)/kdb
 KRB5_PA_MODULE_DIR = $(MODULE_DIR)/preauth
 KRB5_AD_MODULE_DIR = $(MODULE_DIR)/authdata
 KRB5_LIBKRB5_MODULE_DIR = $(MODULE_DIR)/libkrb5
+KRB5_LOCALEDIR = @localedir@
 GSS_MODULE_DIR = @libdir@/gss
 KRB5_INCSUBDIRS = \
 	$(KRB5_INCDIR)/kadm5 \
@@ -244,6 +247,9 @@ host=@krb5_cv_host@
 DEJAFLAGS	= --debug --srcdir $(srcdir) --host $(host)
 RUNTEST		= runtest $(DEJAFLAGS)
 
+RUNPYTEST	= PYTHONPATH=$(top_srcdir)/util VALGRIND="$(VALGRIND)" \
+			$(PYTHON)
+
 START_SERVERS	= $(STESTDIR)/scripts/start_servers $(TEST_SERVER) $(TEST_PATH)
 START_SERVERS_LOCAL = $(STESTDIR)/scripts/start_servers_local
 
@@ -258,16 +264,17 @@ transform = @program_transform_name@
 RM = rm -f
 CP = cp
 MV = mv -f
+LN = ln
 CHMOD=chmod
 RANLIB = @RANLIB@
 ARCHIVE = @ARCHIVE@
 ARADD = @ARADD@
-LN = @LN_S@
 AWK = @AWK@
 LEX = @LEX@
 LEXLIB = @LEXLIB@
 YACC = @YACC@
 PERL = @PERL@
+PYTHON = @PYTHON@
 AUTOCONF = autoconf
 AUTOCONFFLAGS =
 AUTOHEADER = autoheader
@@ -325,6 +332,7 @@ KRB5_DEPLIB	= $(TOPLIBD)/libkrb5$(DEPLIBEXT)
 CRYPTO_DEPLIB	= $(TOPLIBD)/libk5crypto$(DEPLIBEXT)
 COM_ERR_DEPLIB	= $(COM_ERR_DEPLIB-@COM_ERR_VERSION@)
 COM_ERR_DEPLIB-sys = # empty
+COM_ERR_DEPLIB-intlsys = # empty
 COM_ERR_DEPLIB-k5 = $(TOPLIBD)/libcom_err$(DEPLIBEXT)
 SUPPORT_LIBNAME=krb5support
 SUPPORT_DEPLIB	= $(TOPLIBD)/lib$(SUPPORT_LIBNAME)$(DEPLIBEXT)
@@ -351,23 +359,43 @@ KADMCLNT_DEPLIBS	= $(KADMCLNT_DEPLIB) $(KADM_COMM_DEPLIBS)
 COM_ERR_VERSION = @COM_ERR_VERSION@
 COM_ERR_DEPS	= $(COM_ERR_DEPS-@COM_ERR_VERSION@)
 COM_ERR_DEPS-sys =
+COM_ERR_DEPS-intlsys =
 COM_ERR_DEPS-k5	= $(BUILDTOP)/include/com_err.h
 SS_VERSION	= @SS_VERSION@
 SS_DEPS		= $(SS_DEPS-@SS_VERSION@)
 SS_DEPS-sys	=
 SS_DEPS-k5	= $(BUILDTOP)/include/ss/ss.h $(BUILDTOP)/include/ss/ss_err.h
+VERTO_VERSION	= @VERTO_VERSION@
+VERTO_DEPS	= $(VERTO_DEPS-@VERTO_VERSION@)
+VERTO_DEPS-sys	=
+VERTO_DEPS-k5	= $(BUILDTOP)/include/verto.h
+VERTO_K5EV_DEPS	= $(VERTO_K5EV_DEPS-@VERTO_VERSION@)
+VERTO_K5EV_DEPS-sys =
+VERTO_K5EV_DEPS-k5 = $(BUILDTOP)/include/verto-k5ev.h
 
 # LIBS gets substituted in... e.g. -lnsl -lsocket
 
 # GEN_LIB is -lgen if needed for regexp
 GEN_LIB		= @GEN_LIB@
 
+# Editline or readline flags and libraries.
+RL_CFLAGS	= @RL_CFLAGS@
+RL_LIBS		= @RL_LIBS@
+
 SS_LIB		= $(SS_LIB-@SS_VERSION@)
 SS_LIB-sys	= @SS_LIB@
-SS_LIB-k5	= $(TOPLIBD)/libss.a
+SS_LIB-k5	= $(TOPLIBD)/libss.a $(RL_LIBS)
 KDB5_LIB	= -lkdb5 $(KDB5_PLUGIN_LIBS)
 
+VERTO_DEPLIB	= $(VERTO_DEPLIB-@VERTO_VERSION@)
+VERTO_DEPLIB-sys = # empty
+VERTO_DEPLIB-k5	= $(TOPLIBD)/libverto-k5ev$(DEPLIBEXT) $(TOPLIBD)/libverto$(DEPLIBEXT)
+VERTO_CFLAGS	= @VERTO_CFLAGS@
+VERTO_LIBS	= @VERTO_LIBS@
+
 DL_LIB		= @DL_LIB@
+
+LDAP_LIBS	= @LDAP_LIBS@
 
 KRB5_LIB			= -lkrb5
 K5CRYPTO_LIB			= -lk5crypto
@@ -395,6 +423,10 @@ UTIL_LIB	= @UTIL_LIB@
 # eventually) but which we don't want to install.
 APPUTILS_LIB	= -lapputils
 
+# So test programs can find their libraries without "make install", etc.
+KRB5_RUN_ENV=@KRB5_RUN_ENV@
+KRB5_RUN_VARS=@KRB5_RUN_VARS@
+
 #
 # variables for --with-tcl=
 TCL_LIBS	= @TCL_LIBS@
@@ -403,12 +435,23 @@ TCL_RPATH	= @TCL_RPATH@
 TCL_MAYBE_RPATH = @TCL_MAYBE_RPATH@
 TCL_INCLUDES	= @TCL_INCLUDES@
 
+# Crypto and PRNG back-end selections
+CRYPTO_IMPL	= @CRYPTO_IMPL@
+PRNG_ALG	= @PRNG_ALG@
+
+# Crypto back-end selection and flags for PKINIT
+PKINIT_CRYPTO_IMPL		= @PKINIT_CRYPTO_IMPL@
+PKINIT_CRYPTO_IMPL_CFLAGS	= @PKINIT_CRYPTO_IMPL_CFLAGS@
+PKINIT_CRYPTO_IMPL_LIBS		= @PKINIT_CRYPTO_IMPL_LIBS@
+
 # error table rules
 #
 ### /* these are invoked as $(...) foo.et, which works, but could be better */
 COMPILE_ET= $(COMPILE_ET-@COM_ERR_VERSION@)
 COMPILE_ET-sys= compile_et
-COMPILE_ET-k5= $(BUILDTOP)/util/et/compile_et -d $(top_srcdir)/util/et
+COMPILE_ET-intlsys= compile_et --textdomain mit-krb5
+COMPILE_ET-k5= $(BUILDTOP)/util/et/compile_et -d $(top_srcdir)/util/et \
+	--textdomain mit-krb5
 
 .SUFFIXES:  .h .c .et .ct
 
@@ -558,7 +601,7 @@ VALGRIND=
 # Need absolute paths here because under kshd or ftpd we may run programs
 # while in other directories.
 VALGRIND_LOGDIR = `cd $(BUILDTOP)&&pwd`
-VALGRIND1 = valgrind --tool=memcheck --log-file=$(VALGRIND_LOGDIR)/vg --trace-children=yes -v --leak-check=yes --suppressions=`cd $(top_srcdir)&&pwd`/util/valgrind-suppressions
+VALGRIND1 = valgrind --tool=memcheck --log-file=$(VALGRIND_LOGDIR)/vg.%p --trace-children=yes -v --leak-check=yes --suppressions=`cd $(top_srcdir)&&pwd`/util/valgrind-suppressions
 
 # Set OFFLINE=yes to disable tests that assume network connectivity.
 # (Specifically, this concerns the ability to fetch DNS data for
@@ -566,6 +609,9 @@ VALGRIND1 = valgrind --tool=memcheck --log-file=$(VALGRIND_LOGDIR)/vg --trace-ch
 # tests still assume that the local hostname can be resolved into
 # something that looks like an FQDN, with an IPv4 address.
 OFFLINE=no
+
+# Used when running Python tests.
+PYTESTFLAGS=
 
 ##
 ## end of pre.in

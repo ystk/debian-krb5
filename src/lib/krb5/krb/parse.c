@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/krb/parse.c */
 /*
- * lib/krb5/krb/parse.c
- *
  * Copyright 1990,1991,2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,8 +22,9 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
+ */
+
+/*
  * krb5_parse_name() routine.
  *
  * Rewritten by Theodore Ts'o to properly handle arbitrary quoted
@@ -162,7 +162,8 @@ k5_parse_name(krb5_context context, const char *name,
     if (!parsed_realm) {
         if (flags & KRB5_PRINCIPAL_PARSE_REQUIRE_REALM) {
             krb5_set_error_message(context, KRB5_PARSE_MALFORMED,
-                                   "Principal %s is missing required realm", name);
+                                   _("Principal %s is missing required realm"),
+                                   name);
             free(principal->data);
             free(principal);
             return KRB5_PARSE_MALFORMED;
@@ -179,7 +180,7 @@ k5_parse_name(krb5_context context, const char *name,
         realmsize = default_realm_size;
     } else if (flags & KRB5_PRINCIPAL_PARSE_NO_REALM) {
         krb5_set_error_message(context, KRB5_PARSE_MALFORMED,
-                               "Principal %s has realm present", name);
+                               _("Principal %s has realm present"), name);
         free(principal->data);
         free(principal);
         return KRB5_PARSE_MALFORMED;

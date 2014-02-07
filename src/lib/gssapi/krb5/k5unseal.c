@@ -214,7 +214,7 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
         }
 
         if (token.length) {
-            if ((token.value = (void *) xmalloc(token.length)) == NULL) {
+            if ((token.value = (void *) gssalloc_malloc(token.length)) == NULL) {
                 if (sealalg != 0xffff)
                     xfree(plain);
                 *minor_status = ENOMEM;
@@ -272,7 +272,7 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
             if (sealalg != 0xffff)
                 xfree(plain);
             if (toktype == KG_TOK_SEAL_MSG)
-                xfree(token.value);
+                gssalloc_free(token.value);
             *minor_status = ENOMEM;
             return(GSS_S_FAILURE);
         }
@@ -293,18 +293,20 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
 
         if (code) {
             if (toktype == KG_TOK_SEAL_MSG)
-                xfree(token.value);
+                gssalloc_free(token.value);
             *minor_status = code;
             return(GSS_S_FAILURE);
         }
 
-        if ((code = kg_encrypt(context, ctx->seq, KG_USAGE_SEAL,
-                               (g_OID_equal(ctx->mech_used, gss_mech_krb5_old) ?
-                                ctx->seq->keyblock.contents : NULL),
-                               md5cksum.contents, md5cksum.contents, 16))) {
+        code = kg_encrypt_inplace(context, ctx->seq, KG_USAGE_SEAL,
+                                  (g_OID_equal(ctx->mech_used,
+                                               gss_mech_krb5_old) ?
+                                   ctx->seq->keyblock.contents : NULL),
+                                  md5cksum.contents, 16);
+        if (code) {
             krb5_free_checksum_contents(context, &md5cksum);
             if (toktype == KG_TOK_SEAL_MSG)
-                xfree(token.value);
+                gssalloc_free(token.value);
             *minor_status = code;
             return GSS_S_FAILURE;
         }
@@ -325,7 +327,7 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
             if (sealalg != 0xffff)
                 xfree(plain);
             if (toktype == KG_TOK_SEAL_MSG)
-                xfree(token.value);
+                gssalloc_free(token.value);
             *minor_status = code;
             return GSS_S_FAILURE;
         }
@@ -337,7 +339,7 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
             if (sealalg == 0)
                 xfree(plain);
             if (toktype == KG_TOK_SEAL_MSG)
-                xfree(token.value);
+                gssalloc_free(token.value);
             *minor_status = ENOMEM;
             return(GSS_S_FAILURE);
         }
@@ -362,7 +364,7 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
             if (sealalg == 0)
                 xfree(plain);
             if (toktype == KG_TOK_SEAL_MSG)
-                xfree(token.value);
+                gssalloc_free(token.value);
             *minor_status = code;
             return(GSS_S_FAILURE);
         }
@@ -385,7 +387,7 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
             if (sealalg != 0xffff)
                 xfree(plain);
             if (toktype == KG_TOK_SEAL_MSG)
-                xfree(token.value);
+                gssalloc_free(token.value);
             *minor_status = ENOMEM;
             return(GSS_S_FAILURE);
         }
@@ -406,7 +408,7 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
 
         if (code) {
             if (toktype == KG_TOK_SEAL_MSG)
-                xfree(token.value);
+                gssalloc_free(token.value);
             *minor_status = code;
             return(GSS_S_FAILURE);
         }
@@ -423,7 +425,7 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
 
     if (code) {
         if (toktype == KG_TOK_SEAL_MSG)
-            xfree(token.value);
+            gssalloc_free(token.value);
         *minor_status = 0;
         return(GSS_S_BAD_SIG);
     }
@@ -445,7 +447,7 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
     if ((ctx->initiate && direction != 0xff) ||
         (!ctx->initiate && direction != 0)) {
         if (toktype == KG_TOK_SEAL_MSG) {
-            xfree(token.value);
+            gssalloc_free(token.value);
             message_buffer->value = NULL;
             message_buffer->length = 0;
         }
@@ -482,12 +484,6 @@ kg_unseal(minor_status, context_handle, input_token_buffer,
     int toktype2;
     int vfyflags = 0;
     OM_uint32 ret;
-
-    /* validate the context handle */
-    if (! kg_validate_ctx_id(context_handle)) {
-        *minor_status = (OM_uint32) G_VALIDATE_FAILED;
-        return(GSS_S_NO_CONTEXT);
-    }
 
     ctx = (krb5_gss_ctx_id_rec *) context_handle;
 
@@ -547,4 +543,41 @@ kg_unseal(minor_status, context_handle, input_token_buffer,
         save_error_info (*minor_status, ctx->k5_context);
 
     return ret;
+}
+
+OM_uint32 KRB5_CALLCONV
+krb5_gss_unwrap(minor_status, context_handle,
+                input_message_buffer, output_message_buffer,
+                conf_state, qop_state)
+    OM_uint32           *minor_status;
+    gss_ctx_id_t        context_handle;
+    gss_buffer_t        input_message_buffer;
+    gss_buffer_t        output_message_buffer;
+    int                 *conf_state;
+    gss_qop_t           *qop_state;
+{
+    OM_uint32           rstat;
+
+    rstat = kg_unseal(minor_status, context_handle,
+                      input_message_buffer, output_message_buffer,
+                      conf_state, qop_state, KG_TOK_WRAP_MSG);
+    return(rstat);
+}
+
+OM_uint32 KRB5_CALLCONV
+krb5_gss_verify_mic(minor_status, context_handle,
+                    message_buffer, token_buffer,
+                    qop_state)
+    OM_uint32           *minor_status;
+    gss_ctx_id_t        context_handle;
+    gss_buffer_t        message_buffer;
+    gss_buffer_t        token_buffer;
+    gss_qop_t           *qop_state;
+{
+    OM_uint32           rstat;
+
+    rstat = kg_unseal(minor_status, context_handle,
+                      token_buffer, message_buffer,
+                      NULL, qop_state, KG_TOK_MIC_MSG);
+    return(rstat);
 }

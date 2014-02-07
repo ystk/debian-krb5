@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* util/support/plugins.c - Plugin module support functions */
 /*
- * util/support/plugins.c
- *
  * Copyright 2006, 2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,9 +22,6 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
- * Plugin module support, and shims around dlopen/whatever.
  */
 
 #include "k5-plugin.h"
@@ -176,8 +172,10 @@ krb5int_open_plugin (const char *filepath, struct plugin_file_handle **h, struct
 
     if (!err) {
         if (stat (filepath, &statbuf) < 0) {
-            Tprintf ("stat(%s): %s\n", filepath, strerror (errno));
             err = errno;
+            Tprintf ("stat(%s): %s\n", filepath, strerror (err));
+            krb5int_set_error(ep, err, _("unable to find plugin [%s]: %s"),
+                              filepath, strerror(err));
         }
     }
 
@@ -269,10 +267,11 @@ krb5int_open_plugin (const char *filepath, struct plugin_file_handle **h, struct
             if (handle == NULL) {
                 const char *e = dlerror();
                 if (e == NULL)
-                    e = "unknown failure";
+                    e = _("unknown failure");
                 Tprintf ("dlopen(%s): %s\n", filepath, e);
                 err = ENOENT; /* XXX */
-                krb5int_set_error (ep, err, "%s", e);
+                krb5int_set_error(ep, err, _("unable to load plugin [%s]: %s"),
+                                  filepath, e);
             }
         }
 
@@ -294,7 +293,7 @@ krb5int_open_plugin (const char *filepath, struct plugin_file_handle **h, struct
         if (handle == NULL) {
             Tprintf ("Unable to load dll: %s\n", filepath);
             err = ENOENT; /* XXX */
-            krb5int_set_error (ep, err, "%s", "unable to load dll");
+            krb5int_set_error(ep, err, _("unable to load DLL [%s]"), filepath);
         }
 
         if (!err) {
@@ -310,6 +309,7 @@ krb5int_open_plugin (const char *filepath, struct plugin_file_handle **h, struct
 
     if (!err && !got_plugin) {
         err = ENOENT;  /* no plugin or no way to load plugins */
+        krb5int_set_error(ep, err, _("plugin unavailable: %s"), strerror(err));
     }
 
     if (!err) {

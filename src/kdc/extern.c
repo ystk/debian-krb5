@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* kdc/extern.c */
 /*
- * kdc/extern.c
- *
  * Copyright 1990 by the Massachusetts Institute of Technology.
  *
  * Export of this software from the United States of America may
@@ -22,7 +21,9 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
+ */
+
+/*
  *
  * allocations of extern stuff
  */
@@ -37,9 +38,5 @@ int             kdc_numrealms = 0;
 kdc_realm_t     *kdc_active_realm = (kdc_realm_t *) NULL;
 krb5_data empty_string = {0, 0, ""};
 krb5_timestamp kdc_infinity = KRB5_INT32_MAX; /* XXX */
-krb5_rcache     kdc_rcache = (krb5_rcache) NULL;
 krb5_keyblock   psr_key;
 krb5_int32      max_dgram_reply_size = MAX_DGRAM_SIZE;
-
-volatile int signal_requests_exit = 0;  /* gets set when signal hits */
-volatile int signal_requests_hup = 0;   /* ditto */

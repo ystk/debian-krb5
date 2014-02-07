@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* kadmin/dbutil/kdb5_util.h */
 /*
- * admin/edit/kdb5_edit.h
- *
  * Copyright 1992, 2008, 2009 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,7 +22,6 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
  */
 
 #include <kdb_log.h>
@@ -33,7 +31,6 @@
 #define REALM_SEP_STR   "@"
 
 extern char *progname;
-extern char *Err_no_database;
 #ifndef V4_DECLARES_STATIC
 extern krb5_keyblock master_keyblock;
 extern krb5_principal master_princ;

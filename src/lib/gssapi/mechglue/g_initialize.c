@@ -59,8 +59,18 @@
 #endif
 
 /* Local functions */
-static gss_mech_info searchMechList(const gss_OID);
+static void addConfigEntry(const char *oidStr, const char *oid, const char *sharedLib, const char *kernMod, const char *modOptions);
+static gss_mech_info searchMechList(gss_const_OID);
 static void loadConfigFile(const char *);
+#if defined(_WIN32)
+#ifndef MECH_KEY
+#define MECH_KEY "SOFTWARE\\gss\\mech"
+#endif
+static time_t getRegKeyModTime(HKEY hBaseKey, const char *keyPath);
+static time_t getRegConfigModTime(const char *keyPath);
+static void getRegKeyValue(HKEY key, const char *keyPath, const char *valueName, void **data, DWORD *dataLen);
+static void loadConfigFromRegistry(HKEY keyBase, const char *keyPath);
+#endif
 static void updateMechList(void);
 static void freeMechList(void);
 
@@ -102,6 +112,7 @@ gssint_mechglue_init(void)
 	err = gss_spnegoint_lib_init();
 #endif
 
+	err = gssint_mecherrmap_init();
 	return err;
 }
 
@@ -195,25 +206,24 @@ gss_OID *oid;
  * a mech oid set, and only update it once the file has changed.
  */
 OM_uint32 KRB5_CALLCONV
-gss_indicate_mechs(minorStatus, mechSet)
+gss_indicate_mechs(minorStatus, mechSet_out)
 OM_uint32 *minorStatus;
-gss_OID_set *mechSet;
+gss_OID_set *mechSet_out;
 {
 	char *fileName;
 	struct stat fileInfo;
-	unsigned int i, j;
-	gss_OID curItem;
+	OM_uint32 status;
 
 	/* Initialize outputs. */
 
 	if (minorStatus != NULL)
 		*minorStatus = 0;
 
-	if (mechSet != NULL)
-		*mechSet = GSS_C_NO_OID_SET;
+	if (mechSet_out != NULL)
+		*mechSet_out = GSS_C_NO_OID_SET;
 
 	/* Validate arguments. */
-	if (minorStatus == NULL || mechSet == NULL)
+	if (minorStatus == NULL || mechSet_out == NULL)
 		return (GSS_S_CALL_INACCESSIBLE_WRITE);
 
 	*minorStatus = gssint_mechglue_initialize_library();
@@ -234,63 +244,17 @@ gss_OID_set *mechSet;
 		return GSS_S_FAILURE;
 
 	/*
-	 * the mech set is created and it is up to date
-	 * so just copy it to caller
-	 */
-	if ((*mechSet =
-		(gss_OID_set) malloc(sizeof (gss_OID_set_desc))) == NULL)
-	{
-		return (GSS_S_FAILURE);
-	}
-
-	/*
 	 * need to lock the g_mechSet in case someone tries to update it while
 	 * I'm copying it.
 	 */
 	*minorStatus = k5_mutex_lock(&g_mechSetLock);
-	if (*minorStatus)
+	if (*minorStatus) {
 		return GSS_S_FAILURE;
-
-	/* allocate space for the oid structures */
-	if (((*mechSet)->elements =
-		(void*) calloc(g_mechSet.count, sizeof (gss_OID_desc)))
-		== NULL)
-	{
-		(void) k5_mutex_unlock(&g_mechSetLock);
-		free(*mechSet);
-		*mechSet = NULL;
-		return (GSS_S_FAILURE);
 	}
 
-	/* now copy the oid structures */
-	(void) memcpy((*mechSet)->elements, g_mechSet.elements,
-		g_mechSet.count * sizeof (gss_OID_desc));
-
-	(*mechSet)->count = g_mechSet.count;
-
-	/* still need to copy each of the oid elements arrays */
-	for (i = 0; i < (*mechSet)->count; i++) {
-		curItem = &((*mechSet)->elements[i]);
-		curItem->elements =
-			(void *) malloc(g_mechSet.elements[i].length);
-		if (curItem->elements == NULL) {
-			(void) k5_mutex_unlock(&g_mechSetLock);
-			/*
-			 * must still free the allocated elements for
-			 * each allocated gss_OID_desc
-			 */
-			for (j = 0; j < i; j++) {
-				free((*mechSet)->elements[j].elements);
-			}
-			free((*mechSet)->elements);
-			free(*mechSet);
-			*mechSet = NULL;
-			return (GSS_S_FAILURE);
-		}
-		g_OID_copy(curItem, &g_mechSet.elements[i]);
-	}
+	status = generic_gss_copy_oid_set(minorStatus, &g_mechSet, mechSet_out);
 	(void) k5_mutex_unlock(&g_mechSetLock);
-	return (GSS_S_COMPLETE);
+	return (status);
 } /* gss_indicate_mechs */
 
 
@@ -565,6 +529,14 @@ gssint_get_mechanisms(char *mechArray[], int arrayLen)
 static void
 updateMechList(void)
 {
+#if defined(_WIN32)
+	time_t lastConfModTime = getRegConfigModTime(MECH_KEY);
+	if (g_confFileModTime < lastConfModTime) {
+		g_confFileModTime = lastConfModTime;
+		loadConfigFromRegistry(HKEY_CURRENT_USER, MECH_KEY);
+		loadConfigFromRegistry(HKEY_LOCAL_MACHINE, MECH_KEY);
+	}
+#else /* _WIN32 */
 	char *fileName;
 	struct stat fileInfo;
 
@@ -579,6 +551,7 @@ updateMechList(void)
 #if 0
 	init_hardcoded();
 #endif
+#endif /* !_WIN32 */
 } /* updateMechList */
 
 #ifdef _GSS_STATIC_LINK
@@ -608,6 +581,10 @@ releaseMechInfo(gss_mech_info *pCf)
 	if (cf->mech != NULL) {
 		memset(cf->mech, 0, sizeof(*cf->mech));
 		free(cf->mech);
+	}
+	if (cf->mech_ext != NULL) {
+		memset(cf->mech_ext, 0, sizeof(*cf->mech_ext));
+		free(cf->mech_ext);
 	}
 	if (cf->dl_handle != NULL)
 		krb5int_close_plugin(cf->dl_handle);
@@ -645,6 +622,16 @@ gssint_register_mechinfo(gss_mech_info template)
 	new_cf->priority = template->priority;
 	new_cf->freeMech = 1;
 	new_cf->next = NULL;
+
+	if (template->mech_ext != NULL) {
+		new_cf->mech_ext = (gss_mechanism_ext)calloc(1,
+						sizeof(struct gss_config_ext));
+		if (new_cf->mech_ext == NULL) {
+			releaseMechInfo(&new_cf);
+			return ENOMEM;
+		}
+		*new_cf->mech_ext = *template->mech_ext;
+	}
 
 	if (template->kmodName != NULL) {
 		new_cf->kmodName = strdup(template->kmodName);
@@ -712,6 +699,18 @@ gssint_register_mechinfo(gss_mech_info template)
 			(_mech)->_symbol = NULL; \
 	} while (0)
 
+/*
+ * If _symbol is undefined in the shared object but the shared object
+ * is linked against the mechanism glue, it's possible for dlsym() to
+ * return the mechanism glue implementation. Guard against that.
+ */
+#define GSS_ADD_DYNAMIC_METHOD_NOLOOP(_dl, _mech, _symbol)	\
+	do {							\
+		GSS_ADD_DYNAMIC_METHOD(_dl, _mech, _symbol);	\
+		if ((_mech)->_symbol == _symbol)		\
+		    (_mech)->_symbol = NULL;			\
+	} while (0)
+
 static gss_mechanism
 build_dynamicMech(void *dl, const gss_OID mech_type)
 {
@@ -722,67 +721,90 @@ build_dynamicMech(void *dl, const gss_OID mech_type)
 		return NULL;
 	}
 
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_acquire_cred);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_release_cred);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_init_sec_context);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_accept_sec_context);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_process_context_token);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_delete_sec_context);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_context_time);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_get_mic);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_verify_mic);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_wrap);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_unwrap);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_display_status);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_indicate_mechs);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_compare_name);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_display_name);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_import_name);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_release_name);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_inquire_cred);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_add_cred);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_export_sec_context);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_import_sec_context);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_inquire_cred_by_mech);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_inquire_names_for_mech);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_inquire_context);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_acquire_cred);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_release_cred);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_init_sec_context);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_accept_sec_context);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_process_context_token);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_delete_sec_context);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_context_time);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_get_mic);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_verify_mic);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_wrap);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_unwrap);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_display_status);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_indicate_mechs);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_compare_name);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_display_name);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_import_name);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_release_name);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_inquire_cred);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_add_cred);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_export_sec_context);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_import_sec_context);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_inquire_cred_by_mech);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_inquire_names_for_mech);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_inquire_context);
 	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_internal_release_oid);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_wrap_size_limit);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_export_name);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_store_cred);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_inquire_sec_context_by_oid);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_inquire_cred_by_oid);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_set_sec_context_option);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_wrap_size_limit);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_localname);
+	GSS_ADD_DYNAMIC_METHOD(dl, mech, gssspi_authorize_localname);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_export_name);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_duplicate_name);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_store_cred);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_inquire_sec_context_by_oid);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_inquire_cred_by_oid);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_set_sec_context_option);
 	GSS_ADD_DYNAMIC_METHOD(dl, mech, gssspi_set_cred_option);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gssspi_mech_invoke);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_wrap_aead);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_unwrap_aead);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_wrap_iov);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_unwrap_iov);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_wrap_iov_length);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_complete_auth_token);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gssspi_mech_invoke);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_wrap_aead);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_unwrap_aead);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_wrap_iov);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_unwrap_iov);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_wrap_iov_length);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_complete_auth_token);
 	/* Services4User (introduced in 1.8) */
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_acquire_cred_impersonate_name);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_add_cred_impersonate_name);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_acquire_cred_impersonate_name);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_add_cred_impersonate_name);
 	/* Naming extensions (introduced in 1.8) */
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_display_name_ext);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_inquire_name);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_get_name_attribute);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_set_name_attribute);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_delete_name_attribute);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_export_name_composite);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_map_name_to_any);
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_release_any_name_mapping);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_display_name_ext);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_inquire_name);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_get_name_attribute);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_set_name_attribute);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_delete_name_attribute);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_export_name_composite);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_map_name_to_any);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_release_any_name_mapping);
         /* RFC 4401 (introduced in 1.8) */
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_pseudo_random);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_pseudo_random);
 	/* RFC 4178 (introduced in 1.8; gss_get_neg_mechs not implemented) */
-	GSS_ADD_DYNAMIC_METHOD(dl, mech, gss_set_neg_mechs);
+	GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_set_neg_mechs);
+        /* draft-ietf-sasl-gs2 */
+        GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_inquire_saslname_for_mech);
+        GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_inquire_mech_for_saslname);
+        /* RFC 5587 */
+        GSS_ADD_DYNAMIC_METHOD_NOLOOP(dl, mech, gss_inquire_attrs_for_mech);
 
 	assert(mech_type != GSS_C_NO_OID);
 
 	mech->mech_type = *(mech_type);
 
 	return mech;
+}
+
+static gss_mechanism_ext
+build_dynamicMechExt(void *dl, const gss_OID mech_type)
+{
+	gss_mechanism_ext mech_ext;
+
+	mech_ext = (gss_mechanism_ext)calloc(1, sizeof(*mech_ext));
+	if (mech_ext == NULL) {
+		return NULL;
+	}
+
+	GSS_ADD_DYNAMIC_METHOD(dl, mech_ext, gssspi_acquire_cred_with_password);
+
+	return mech_ext;
 }
 
 static void
@@ -825,8 +847,7 @@ freeMechList(void)
  * module if it has not been already loaded.
  */
 gss_mechanism
-gssint_get_mechanism(oid)
-const gss_OID oid;
+gssint_get_mechanism(gss_const_OID oid)
 {
 	gss_mech_info aMech;
 	gss_mechanism (*sym)(const gss_OID);
@@ -906,66 +927,56 @@ gssint_get_mechanism_ext(oid)
 const gss_OID oid;
 {
 	gss_mech_info aMech;
-	gss_mechanism_ext mech_ext;
 
 	if (gssint_mechglue_initialize_library() != 0)
 		return (NULL);
 
+	if (k5_mutex_lock(&g_mechListLock) != 0)
+		return NULL;
 	/* check if the mechanism is already loaded */
-	if ((aMech = searchMechList(oid)) != NULL && aMech->mech_ext != NULL)
+	if ((aMech = searchMechList(oid)) != NULL && aMech->mech_ext) {
+		(void) k5_mutex_unlock(&g_mechListLock);
 		return (aMech->mech_ext);
+	}
 
-	if (gssint_get_mechanism(oid) == NULL)
-		return (NULL);
-
-	if (aMech->dl_handle == NULL)
-		return (NULL);
-
-	/* Load the gss_config_ext struct for this mech */
-
-	mech_ext = (gss_mechanism_ext)malloc(sizeof (struct gss_config_ext));
-
-	if (mech_ext == NULL)
-		return (NULL);
-
-#if 0
 	/*
-	 * dlsym() the mech's 'method' functions for the extended APIs
-	 *
-	 * NOTE:  Until the void *context argument is removed from the
-	 * SPI method functions' signatures it will be necessary to have
-	 * different function pointer typedefs and function names for
-	 * the SPI methods than for the API.  When this argument is
-	 * removed it will be possible to rename gss_*_sfct to gss_*_fct
-	 * and and gssspi_* to gss_*.
+	 * might need to re-read the configuration file before loading
+	 * the mechanism to ensure we have the latest info.
 	 */
-	mech_ext->gss_acquire_cred_with_password =
-		(gss_acquire_cred_with_password_sfct)dlsym(aMech->dl_handle,
-			"gssspi_acquire_cred_with_password");
-#endif
+	updateMechList();
 
-	/* Set aMech->mech_ext */
-	(void) k5_mutex_lock(&g_mechListLock);
+	aMech = searchMechList(oid);
 
-	if (aMech->mech_ext == NULL)
-		aMech->mech_ext = mech_ext;
-	else
-		free(mech_ext);	/* we raced and lost; don't leak */
+	/* is the mechanism present in the list ? */
+	if (aMech == NULL || aMech->dl_handle == NULL) {
+		(void) k5_mutex_unlock(&g_mechListLock);
+		return ((gss_mechanism_ext)NULL);
+	}
+
+	/* has another thread loaded the mech */
+	if (aMech->mech_ext) {
+		(void) k5_mutex_unlock(&g_mechListLock);
+		return (aMech->mech_ext);
+	}
+
+	/* Try dynamic dispatch table */
+	aMech->mech_ext = build_dynamicMechExt(aMech->dl_handle,
+                                               aMech->mech_type);
+	if (aMech->mech_ext == NULL) {
+		(void) k5_mutex_unlock(&g_mechListLock);
+		return ((gss_mechanism_ext)NULL);
+	}
 
 	(void) k5_mutex_unlock(&g_mechListLock);
-
 	return (aMech->mech_ext);
-
 } /* gssint_get_mechanism_ext */
-
 
 /*
  * this routine is used for searching the list of mechanism data.
  *
  * this needs to be called with g_mechListLock held.
  */
-static gss_mech_info searchMechList(oid)
-const gss_OID oid;
+static gss_mech_info searchMechList(gss_const_OID oid)
 {
 	gss_mech_info aMech = g_mechList;
 
@@ -983,7 +994,6 @@ const gss_OID oid;
 	return ((gss_mech_info) NULL);
 } /* searchMechList */
 
-
 /*
  * loads the configuration file
  * this is called while having a mutex lock on the mechanism list
@@ -993,15 +1003,9 @@ const gss_OID oid;
 static void loadConfigFile(fileName)
 const char *fileName;
 {
-	char buffer[BUFSIZ], *oidStr, *oid, *sharedLib, *kernMod, *endp;
-	char *modOptions;
-	char sharedPath[sizeof (MECH_LIB_PREFIX) + BUFSIZ];
-	char *tmpStr;
+	char *sharedLib, *kernMod, *modOptions, *oid, *endp;
+	char buffer[BUFSIZ], *oidStr;
 	FILE *confFile;
-	gss_OID mechOid;
-	gss_mech_info aMech, tmp;
-	OM_uint32 minor;
-	gss_buffer_desc oidBuf;
 
 	if ((confFile = fopen(fileName, "r")) == NULL) {
 		return;
@@ -1019,64 +1023,35 @@ const char *fileName;
 		 * the mechanism name
 		 */
 		oidStr = buffer;
-		for (oid = buffer; *oid && !isspace(*oid); oid++);
+		for (endp = buffer; *endp && !isspace(*endp); endp++);
 
 		/* Now find the first non-white-space character */
-		if (*oid) {
-			*oid = '\0';
-			oid++;
-			while (*oid && isspace(*oid))
-				oid++;
+		if (*endp) {
+			*endp = '\0';
+			endp++;
+			while (*endp && isspace(*endp))
+				endp++;
 		}
 
 		/*
 		 * If that's all, then this is a corrupt entry. Skip it.
 		 */
-		if (! *oid)
+		if (! *endp)
 			continue;
 
 		/* Find the end of the oid and make sure it is NULL-ended */
-		for (endp = oid; *endp && !isspace(*endp); endp++)
+		for (oid = endp; *endp && !isspace(*endp); endp++)
 			;
 
 		if (*endp) {
 			*endp = '\0';
-		}
-
-		/*
-		 * check if an entry for this oid already exists
-		 * if it does, and the library is already loaded then
-		 * we can't modify it, so skip it
-		 */
-		oidBuf.value = (void *)oid;
-		oidBuf.length = strlen(oid);
-		if (generic_gss_str_to_oid(&minor, &oidBuf, &mechOid)
-			!= GSS_S_COMPLETE) {
-#if 0
-			(void) syslog(LOG_INFO, "invalid mechanism oid"
-					" [%s] in configuration file", oid);
-#endif
-			continue;
-		}
-
-		aMech = searchMechList(mechOid);
-		if (aMech && aMech->mech) {
-			generic_gss_release_oid(&minor, &mechOid);
-			continue;
+			endp++;
 		}
 
 		/* Find the start of the shared lib name */
-		for (sharedLib = endp+1; *sharedLib && isspace(*sharedLib);
-			sharedLib++)
+		for (sharedLib = endp; *sharedLib && isspace(*sharedLib);
+		     sharedLib++)
 			;
-
-		/*
-		 * If that's all, then this is a corrupt entry. Skip it.
-		 */
-		if (! *sharedLib) {
-			generic_gss_release_oid(&minor, &mechOid);
-			continue;
-		}
 
 		/*
 		 * Find the end of the shared lib name and make sure it is
@@ -1087,11 +1062,12 @@ const char *fileName;
 
 		if (*endp) {
 			*endp = '\0';
+			endp++;
 		}
 
 		/* Find the start of the optional kernel module lib name */
-		for (kernMod = endp+1; *kernMod && isspace(*kernMod);
-			kernMod++)
+		for (kernMod = endp; *kernMod && isspace(*kernMod);
+		     kernMod++)
 			;
 
 		/*
@@ -1109,106 +1085,323 @@ const char *fileName;
 
 			if (*endp) {
 				*endp = '\0';
+				endp++;
 			}
 		} else
 			kernMod = NULL;
 
 		/* Find the start of the optional module options list */
-		for (modOptions = endp+1; *modOptions && isspace(*modOptions);
-			modOptions++);
+		for (modOptions = endp; *modOptions && isspace(*modOptions);
+		     modOptions++);
 
 		if (*modOptions == '[')  {
 			/* move past the opening bracket */
 			for (modOptions = modOptions+1;
-			    *modOptions && isspace(*modOptions);
-			    modOptions++);
+			     *modOptions && isspace(*modOptions);
+			     modOptions++);
 
 			/* Find the closing bracket */
 			for (endp = modOptions;
-				*endp && *endp != ']'; endp++);
+			     *endp && *endp != ']'; endp++);
 
 			*endp = '\0';
 		} else {
 			modOptions = NULL;
 		}
 
-		snprintf(sharedPath, sizeof(sharedPath), "%s%s", MECH_LIB_PREFIX, sharedLib);
-
-		/*
-		 * are we creating a new mechanism entry or
-		 * just modifying existing (non loaded) mechanism entry
-		 */
-		if (aMech) {
-			/*
-			 * delete any old values and set new
-			 * mechNameStr and mech_type are not modified
-			 */
-			if (aMech->kmodName) {
-				free(aMech->kmodName);
-				aMech->kmodName = NULL;
-			}
-
-			if (aMech->optionStr) {
-				free(aMech->optionStr);
-				aMech->optionStr = NULL;
-			}
-
-			if ((tmpStr = strdup(sharedPath)) != NULL) {
-				if (aMech->uLibName)
-					free(aMech->uLibName);
-				aMech->uLibName = tmpStr;
-			}
-
-			if (kernMod) /* this is an optional parameter */
-				aMech->kmodName = strdup(kernMod);
-
-			if (modOptions) /* optional module options */
-				aMech->optionStr = strdup(modOptions);
-
-			/* the oid is already set */
-			generic_gss_release_oid(&minor, &mechOid);
-			continue;
-		}
-
-		/* adding a new entry */
-		aMech = calloc(1, sizeof (struct gss_mech_config));
-		if (aMech == NULL) {
-			generic_gss_release_oid(&minor, &mechOid);
-			continue;
-		}
-		aMech->mech_type = mechOid;
-		aMech->uLibName = strdup(sharedPath);
-		aMech->mechNameStr = strdup(oidStr);
-		aMech->freeMech = 0;
-
-		/* check if any memory allocations failed - bad news */
-		if (aMech->uLibName == NULL || aMech->mechNameStr == NULL) {
-			if (aMech->uLibName)
-				free(aMech->uLibName);
-			if (aMech->mechNameStr)
-				free(aMech->mechNameStr);
-			generic_gss_release_oid(&minor, &mechOid);
-			free(aMech);
-			continue;
-		}
-		if (kernMod)	/* this is an optional parameter */
-			aMech->kmodName = strdup(kernMod);
-
-		if (modOptions)
-			aMech->optionStr = strdup(modOptions);
-		/*
-		 * add the new entry to the end of the list - make sure
-		 * that only complete entries are added because other
-		 * threads might currently be searching the list.
-		 */
-		tmp = g_mechListTail;
-		g_mechListTail = aMech;
-
-		if (tmp != NULL)
-			tmp->next = aMech;
-
-		if (g_mechList == NULL)
-			g_mechList = aMech;
+		addConfigEntry(oidStr, oid, sharedLib, kernMod, modOptions);
 	} /* while */
 	(void) fclose(confFile);
 } /* loadConfigFile */
+
+#if defined(_WIN32)
+
+static time_t
+filetimeToTimet(const FILETIME *ft)
+{
+	ULARGE_INTEGER ull;
+
+	ull.LowPart = ft->dwLowDateTime;
+	ull.HighPart = ft->dwHighDateTime;
+	return (time_t)(ull.QuadPart / 10000000ULL - 11644473600ULL);
+}
+
+static time_t
+getRegConfigModTime(const char *keyPath)
+{
+	time_t currentUserModTime = getRegKeyModTime(HKEY_CURRENT_USER,
+						     keyPath);
+	time_t localMachineModTime = getRegKeyModTime(HKEY_LOCAL_MACHINE,
+						      keyPath);
+
+	return currentUserModTime > localMachineModTime ? currentUserModTime :
+		localMachineModTime;
+}
+
+static time_t
+getRegKeyModTime(HKEY hBaseKey, const char *keyPath)
+{
+	HKEY hConfigKey;
+	HRESULT rc;
+	int iSubKey = 0;
+	time_t modTime = 0, keyModTime;
+	FILETIME keyLastWriteTime;
+	char subKeyName[256];
+
+	if ((rc = RegOpenKeyEx(hBaseKey, keyPath, 0, KEY_ENUMERATE_SUB_KEYS,
+			       &hConfigKey)) != ERROR_SUCCESS) {
+		/* TODO: log error message */
+		return 0;
+	}
+	do {
+		int subKeyNameSize=sizeof(subKeyName)/sizeof(subKeyName[0]);
+		if ((rc = RegEnumKeyEx(hConfigKey, iSubKey++, subKeyName,
+				       &subKeyNameSize, NULL, NULL, NULL,
+				       &keyLastWriteTime)) != ERROR_SUCCESS) {
+			break;
+		}
+		keyModTime = filetimeToTimet(&keyLastWriteTime);
+		if (modTime < keyModTime) {
+			modTime = keyModTime;
+		}
+	} while (1);
+	RegCloseKey(hConfigKey);
+	return modTime;
+}
+
+static void
+getRegKeyValue(HKEY hKey, const char *keyPath, const char *valueName,
+	       void **data, DWORD* dataLen)
+{
+	DWORD sizeRequired=*dataLen;
+	HRESULT hr;
+	/* Get data length required */
+	if ((hr = RegGetValue(hKey, keyPath, valueName, RRF_RT_REG_SZ, NULL,
+			      NULL, &sizeRequired)) != ERROR_SUCCESS) {
+		/* TODO: LOG registry error */
+		return;
+	}
+	/* adjust data buffer size if necessary */
+	if (*dataLen < sizeRequired) {
+		*dataLen = sizeRequired;
+		*data = realloc(*data, sizeRequired);
+		if (!*data) {
+			*dataLen = 0;
+			/* TODO: LOG OOM ERROR! */
+			return;
+		}
+	}
+	/* get data */
+	if ((hr = RegGetValue(hKey, keyPath, valueName, RRF_RT_REG_SZ, NULL,
+			      *data, &sizeRequired)) != ERROR_SUCCESS) {
+		/* LOG registry error */
+		return;
+	}
+}
+
+static void
+loadConfigFromRegistry(HKEY hBaseKey, const char *keyPath)
+{
+	HKEY hConfigKey;
+	DWORD iSubKey, nSubKeys, maxSubKeyNameLen;
+	char *oidStr = NULL, *oid = NULL, *sharedLib = NULL, *kernMod = NULL;
+	char *modOptions = NULL;
+	DWORD oidStrLen = 0, oidLen = 0, sharedLibLen = 0, kernModLen = 0;
+	DWORD modOptionsLen = 0;
+	HRESULT rc;
+
+	if ((rc = RegOpenKeyEx(hBaseKey, keyPath, 0,
+			       KEY_ENUMERATE_SUB_KEYS|KEY_QUERY_VALUE,
+			       &hConfigKey)) != ERROR_SUCCESS) {
+		/* TODO: log registry error */
+		return;
+	}
+
+	if ((rc = RegQueryInfoKey(hConfigKey,
+		NULL, /* lpClass */
+		NULL, /* lpcClass */
+		NULL, /* lpReserved */
+		&nSubKeys,
+		&maxSubKeyNameLen,
+		NULL, /* lpcMaxClassLen */
+		NULL, /* lpcValues */
+		NULL, /* lpcMaxValueNameLen */
+		NULL, /* lpcMaxValueLen */
+		NULL, /* lpcbSecurityDescriptor */
+		NULL  /* lpftLastWriteTime */ )) != ERROR_SUCCESS) {
+		goto cleanup;
+	}
+	oidStr = malloc(++maxSubKeyNameLen);
+	if (!oidStr) {
+		goto cleanup;
+	}
+	for (iSubKey=0; iSubKey<nSubKeys; iSubKey++) {
+		oidStrLen = maxSubKeyNameLen;
+		if ((rc = RegEnumKeyEx(hConfigKey, iSubKey, oidStr, &oidStrLen,
+				       NULL, NULL, NULL, NULL)) !=
+		    ERROR_SUCCESS) {
+			/* TODO: log registry error */
+			continue;
+		}
+		getRegKeyValue(hConfigKey, oidStr, "OID", &oid, &oidLen);
+		getRegKeyValue(hConfigKey, oidStr, "Shared Library",
+			       &sharedLib, &sharedLibLen);
+		getRegKeyValue(hConfigKey, oidStr, "Kernel Module", &kernMod,
+			       &kernModLen);
+		getRegKeyValue(hConfigKey, oidStr, "Options", &modOptions,
+			       &modOptionsLen);
+		addConfigEntry(oidStr, oid, sharedLib, kernMod, modOptions);
+	}
+cleanup:
+	RegCloseKey(hConfigKey);
+	if (oidStr) {
+		free(oidStr);
+	}
+	if (oid) {
+		free(oid);
+	}
+	if (sharedLib) {
+		free(sharedLib);
+	}
+	if (kernMod) {
+		free(kernMod);
+	}
+	if (modOptions) {
+		free(modOptions);
+	}
+}
+#endif
+
+static void
+addConfigEntry(const char *oidStr, const char *oid, const char *sharedLib,
+	       const char *kernMod, const char *modOptions)
+{
+#if defined(_WIN32)
+	const char *sharedPath;
+#else
+	char sharedPath[sizeof (MECH_LIB_PREFIX) + BUFSIZ];
+#endif
+	char *tmpStr;
+	gss_OID mechOid;
+	gss_mech_info aMech, tmp;
+	OM_uint32 minor;
+	gss_buffer_desc oidBuf;
+
+	if ((!oid) || (!oidStr)) {
+		return;
+	}
+	/*
+	 * check if an entry for this oid already exists
+	 * if it does, and the library is already loaded then
+	 * we can't modify it, so skip it
+	 */
+	oidBuf.value = (void *)oid;
+	oidBuf.length = strlen(oid);
+	if (generic_gss_str_to_oid(&minor, &oidBuf, &mechOid)
+		!= GSS_S_COMPLETE) {
+#if 0
+		(void) syslog(LOG_INFO, "invalid mechanism oid"
+				" [%s] in configuration file", oid);
+#endif
+		return;
+	}
+
+	aMech = searchMechList(mechOid);
+	if (aMech && aMech->mech) {
+		generic_gss_release_oid(&minor, &mechOid);
+		return;
+	}
+
+	/*
+	 * If that's all, then this is a corrupt entry. Skip it.
+	 */
+	if (! *sharedLib) {
+		generic_gss_release_oid(&minor, &mechOid);
+		return;
+	}
+#if defined(_WIN32)
+	sharedPath = sharedLib;
+#else
+	if (sharedLib[0] == '/')
+		snprintf(sharedPath, sizeof(sharedPath), "%s", sharedLib);
+	else
+		snprintf(sharedPath, sizeof(sharedPath), "%s%s",
+			 MECH_LIB_PREFIX, sharedLib);
+#endif
+	/*
+	 * are we creating a new mechanism entry or
+	 * just modifying existing (non loaded) mechanism entry
+	 */
+	if (aMech) {
+		/*
+		 * delete any old values and set new
+		 * mechNameStr and mech_type are not modified
+		 */
+		if (aMech->kmodName) {
+			free(aMech->kmodName);
+			aMech->kmodName = NULL;
+		}
+
+		if (aMech->optionStr) {
+			free(aMech->optionStr);
+			aMech->optionStr = NULL;
+		}
+
+		if ((tmpStr = strdup(sharedPath)) != NULL) {
+			if (aMech->uLibName)
+				free(aMech->uLibName);
+			aMech->uLibName = tmpStr;
+		}
+
+		if (kernMod) /* this is an optional parameter */
+			aMech->kmodName = strdup(kernMod);
+
+		if (modOptions) /* optional module options */
+			aMech->optionStr = strdup(modOptions);
+
+		/* the oid is already set */
+		generic_gss_release_oid(&minor, &mechOid);
+		return;
+	}
+
+	/* adding a new entry */
+	aMech = calloc(1, sizeof (struct gss_mech_config));
+	if (aMech == NULL) {
+		generic_gss_release_oid(&minor, &mechOid);
+		return;
+	}
+	aMech->mech_type = mechOid;
+	aMech->uLibName = strdup(sharedPath);
+	aMech->mechNameStr = strdup(oidStr);
+	aMech->freeMech = 0;
+
+	/* check if any memory allocations failed - bad news */
+	if (aMech->uLibName == NULL || aMech->mechNameStr == NULL) {
+		if (aMech->uLibName)
+			free(aMech->uLibName);
+		if (aMech->mechNameStr)
+			free(aMech->mechNameStr);
+		generic_gss_release_oid(&minor, &mechOid);
+		free(aMech);
+		return;
+	}
+	if (kernMod)	/* this is an optional parameter */
+		aMech->kmodName = strdup(kernMod);
+
+	if (modOptions)
+		aMech->optionStr = strdup(modOptions);
+	/*
+	 * add the new entry to the end of the list - make sure
+	 * that only complete entries are added because other
+	 * threads might currently be searching the list.
+	 */
+	tmp = g_mechListTail;
+	g_mechListTail = aMech;
+
+	if (tmp != NULL)
+		tmp->next = aMech;
+
+	if (g_mechList == NULL)
+		g_mechList = aMech;
+}
+
