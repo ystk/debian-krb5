@@ -3,26 +3,7 @@ AC_COPYRIGHT([Copyright 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 20
 Massachusetts Institute of Technology.
 ])
 dnl
-dnl Figure out the top of the source and build trees.  We depend on localdir
-dnl being a relative pathname; we could make it general later, but for now 
-dnl this is good enough.
-dnl
-dnl esyscmd([test -r aclocal.m4 && echo YES])
-define([fileexists],[dnl
-pushdef([x],esyscmd([if test -r $1; then echo YES;else echo NO; fi]))dnl
-dnl Strip out newline.
-ifelse(x,[YES
-],[YES],x,[NO
-],[NO],UNKNOWN)[]popdef([x])])
-define([K5_TOPDIR],dnl
-ifelse(fileexists(./aclocal.m4),YES,[.],[dnl
-ifelse(fileexists(../aclocal.m4),YES,[..],[dnl
-ifelse(fileexists(../../aclocal.m4),YES,[../..],[dnl
-ifelse(fileexists(../../../aclocal.m4),YES,[../../..],[dnl
-ifelse(fileexists(../../../../aclocal.m4),YES,[../../../..],[dnl
-errprint(__file__:__line__: Cannot find path to aclocal.m4[
-]) m4exit(1) dnl sometimes that does not work?
-builtin(m4exit,1)UNKNOWN])])])])]))
+define([K5_TOPDIR],[.])dnl
 dnl
 AC_DEFUN(V5_SET_TOPDIR,[dnl
 ac_reltopdir="K5_TOPDIR"
@@ -466,7 +447,7 @@ krb5_ac_warn_cxxflags_set=${WARN_CXXFLAGS+set}
 ])
 dnl
 AC_DEFUN(TRY_WARN_CC_FLAG,[dnl
-  cachevar=`echo "krb5_cv_cc_flag_$1" | sed s/[[^a-zA-Z0-9_]]/_/g`
+  cachevar=`echo "krb5_cv_cc_flag_$1" | sed -e s/=/_eq_/g -e s/-/_dash_/g -e s/[[^a-zA-Z0-9_]]/_/g`
   AC_CACHE_CHECK([if C compiler supports $1], [$cachevar],
   [# first try without, then with
   AC_TRY_COMPILE([], 1;,
@@ -543,7 +524,7 @@ if test "$GCC" = yes ; then
     TRY_WARN_CC_FLAG(-Wno-format-zero-length)
     # Other flags here may not be supported on some versions of
     # gcc that people want to use.
-    for flag in overflow strict-overflow missing-format-attribute missing-prototypes return-type missing-braces parentheses switch unused-function unused-label unused-variable unused-value unknown-pragmas sign-compare newline-eof ; do
+    for flag in overflow strict-overflow missing-format-attribute missing-prototypes return-type missing-braces parentheses switch unused-function unused-label unused-variable unused-value unknown-pragmas sign-compare newline-eof error=uninitialized ; do
       TRY_WARN_CC_FLAG(-W$flag)
     done
     #  old-style-definition? generates many, many warnings
@@ -565,7 +546,17 @@ if test "$GCC" = yes ; then
         TRY_WARN_CC_FLAG(-W$flag)
       fi
     done
-    #  missing-prototypes? maybe someday
+    # We require function declarations now.
+    #
+    # In some compiler versions -- e.g., "gcc version 4.2.1 (Apple
+    # Inc. build 5664)" -- the -Werror- option works, but the -Werror=
+    # version doesn't cause implicitly declared functions to be
+    # flagged as errors.  If neither works, -Wall implies
+    # -Wimplicit-function-declaration so don't bother.
+    TRY_WARN_CC_FLAG(-Werror-implicit-function-declaration)
+    if test "implicit-function-declaration_supported" = no; then
+      TRY_WARN_CC_FLAG(-Werror=implicit-function-declaration)
+    fi
     #
   fi
   if test "`uname -s`" = Darwin ; then
@@ -716,49 +707,6 @@ AC_DEFUN(KRB5_AC_NEED_DAEMON, [
 KRB5_NEED_PROTO([#ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif],daemon,1)])dnl
-dnl
-dnl Check if stdarg or varargs is available *and compiles*; prefer stdarg.
-dnl (This was sent to djm for incorporation into autoconf 3/12/1996.  KR)
-dnl
-AC_DEFUN(AC_HEADER_STDARG, [
-
-AC_MSG_CHECKING([for stdarg.h])
-AC_CACHE_VAL(ac_cv_header_stdarg_h,
-[AC_TRY_COMPILE([#include <stdarg.h>], [
-  } /* ac_try_compile will have started a function body */
-  int aoeu (char *format, ...) {
-    va_list v;
-    int i;
-    va_start (v, format);
-    i = va_arg (v, int);
-    va_end (v);
-],ac_cv_header_stdarg_h=yes,ac_cv_header_stdarg_h=no)])dnl
-AC_MSG_RESULT($ac_cv_header_stdarg_h)
-if test $ac_cv_header_stdarg_h = yes; then
-  AC_DEFINE(HAVE_STDARG_H, 1, [Define if stdarg available and compiles])
-else
-
-AC_MSG_CHECKING([for varargs.h])
-AC_CACHE_VAL(ac_cv_header_varargs_h,
-[AC_TRY_COMPILE([#include <varargs.h>],[
-  } /* ac_try_compile will have started a function body */
-  int aoeu (va_alist) va_dcl {
-    va_list v;
-    int i;
-    va_start (v);
-    i = va_arg (v, int);
-    va_end (v);
-],ac_cv_header_varargs_h=yes,ac_cv_header_varargs_h=no)])dnl
-AC_MSG_RESULT($ac_cv_header_varargs_h)
-if test $ac_cv_header_varargs_h = yes; then
-  AC_DEFINE(HAVE_VARARGS_H, 1, [Define if varargs available and compiles])
-else
-  AC_MSG_ERROR(Neither stdarg nor varargs compile?)
-fi
-
-fi dnl stdarg test failure
-
-])dnl
 
 dnl
 dnl KRB5_AC_NEED_LIBGEN --- check if libgen needs to be linked in for
@@ -1131,7 +1079,9 @@ dnl Set up environment for running dynamic executables out of build tree
 AC_DEFUN(KRB5_RUN_FLAGS,
 [AC_REQUIRE([KRB5_LIB_AUX])dnl
 KRB5_RUN_ENV="$RUN_ENV"
-AC_SUBST(KRB5_RUN_ENV)])
+KRB5_RUN_VARS="$RUN_VARS"
+AC_SUBST(KRB5_RUN_ENV)
+AC_SUBST(KRB5_RUN_VARS)])
 
 dnl
 dnl KRB5_LIB_AUX
@@ -1180,9 +1130,13 @@ if test "x$enable_static" = xyes; then
 	KDB5_PLUGIN_DEPLIBS='$(TOPLIBD)/libkrb5_db2$(DEPLIBEXT)'
 	KDB5_PLUGIN_LIBS='-lkrb5_db2'
 	if test "x$OPENLDAP_PLUGIN" = xyes; then
-		KDB5_PLUGIN_DEBLIBS=$KDB5_PLUGIN_DEPLIBS' $(TOPLIBD)/libkrb5_ldap$(DEPLIBEXT)'
-		KDB5_PLUGIN_LIBS=$KDB_LUGIN_LIBS' -lkrb5_ldap'
+		KDB5_PLUGIN_DEBLIBS=$KDB5_PLUGIN_DEPLIBS' $(TOPLIBD)/libkrb5_ldap$(DEPLIBEXT) $(TOPLIBD)/libkdb_ldap$(DEPLIBEXT)'
+		KDB5_PLUGIN_LIBS=$KDB5_PLUGIN_LIBS' -lkrb5_kldap -lkdb_ldap $(LDAP_LIBS)'
 	fi
+	# kadm5srv_mit normally comes before kdb on the link line.  Add it
+	# again after the KDB plugins, since they depend on it for XDR stuff.
+	KDB5_PLUGIN_DEPLIBS=$KDB5_PLUGIN_DEPLIBS' $(TOPLIBD)/libkadm5srv_mit$(DEPLIBEXT)'
+	KDB5_PLUGIN_LIBS=$KDB5_PLUGIN_LIBS' -lkadm5srv_mit'
 
 	# avoid duplicate rules generation for AIX and such
 	SHLIBEXT=.so-nobuild
@@ -1448,6 +1402,7 @@ AC_ARG_WITH([system-et],
 AC_HELP_STRING(--with-system-et,use system compile_et and -lcom_err @<:@default: build and install a local version@:>@))
 AC_MSG_CHECKING(which version of com_err to use)
 if test "x$with_system_et" = xyes ; then
+  # This will be changed to "intlsys" if textdomain support is present.
   COM_ERR_VERSION=sys
   AC_MSG_RESULT(system)
 else
@@ -1476,11 +1431,29 @@ EOF
       		 ],[ &et_foo_error_table; ],:,
 		 [AC_MSG_ERROR(cannot use et_foo_error_table)])
   # Anything else we need to test for?
-  rm -f conf$$e.et conf$$e.c conf$$e.h
+  rm -f conf$$e.c conf$$e.h
   krb5_cv_compile_et_useful=yes
   ])
+  AC_CACHE_CHECK(whether compile_et supports --textdomain,
+                 krb5_cv_compile_et_textdomain,[
+  krb5_cv_compile_et_textdomain=no
+  if compile_et --textdomain=xyzw conf$$e.et >/dev/null 2>&1 ; then
+    if grep -q xyzw conf$$e.c; then
+      krb5_cv_compile_et_textdomain=yes
+    fi
+  fi
+  rm -f conf$$e.c conf$$e.h
+  ])
+  if test "$krb5_cv_compile_et_textdomain" = yes; then
+    COM_ERR_VERSION=intlsys
+  fi
+  rm -f conf$$e.et
 fi
 AC_SUBST(COM_ERR_VERSION)
+if test "$COM_ERR_VERSION" = k5 -o "$COM_ERR_VERSION" = intlsys; then
+  AC_DEFINE(HAVE_COM_ERR_INTL,1,
+            [Define if com_err has compatible gettext support])
+fi
 ])
 AC_DEFUN([KRB5_AC_CHOOSE_SS],[
 AC_ARG_WITH(system-ss,

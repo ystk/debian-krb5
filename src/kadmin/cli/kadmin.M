@@ -1,7 +1,7 @@
 .TH KADMIN 1
 .SH NAME
 kadmin \- Kerberos V5 database administration program
-.SH SYNOPSYS
+.SH SYNOPSIS
 .TP
 .B kadmin
 .ad l
@@ -286,11 +286,11 @@ maximum ticket life for the principal
 maximum renewable life of tickets for the principal
 .TP
 \fB\-kvno\fP \fIkvno\fP
-explicity set the key version number.
+explicitly set the key version number.
 .TP
 \fB\-policy\fP \fIpolicy\fP
 policy used by this principal.  If no policy is supplied, then if the
-policy "default" exists and the \-clearpolicy is not also specified,
+policy "default" exists and the -clearpolicy is not also specified,
 then the policy "default" is used; otherwise, the principal 
 will have no policy, and a warning message will be printed.
 .TP
@@ -495,7 +495,7 @@ all ACLs before reusing.
 kadmin:
 .TP
 ERRORS:
-KADM5_AUTH_DELETE (reequires "delete" privilege)
+KADM5_AUTH_DELETE (requires "delete" privilege)
 KADM5_UNK_PRINC (principal does not exist)
 .RE
 .fi
@@ -525,6 +525,11 @@ Associates a ticket policy to the Kerberos principal.
 Associates a Kerberos principal with a LDAP object. This option is honored only
 if the Kerberos principal is not already associated with a LDAP object. 
 .RE
+.TP
+.B \-unlock
+Unlocks a locked principal (one which has received too many failed
+authentication attempts without enough time between them according to
+its password policy) so that it can successfully authenticate.
 .TP
 ERRORS:
 KADM5_AUTH_MODIFY (requires "modify" privilege)
@@ -562,8 +567,7 @@ enctype\-salttype pairs.  This will not function against kadmin
 daemons earlier than krb5\-1.2.
 .TP
 \fB\-keepold \fP 
-Keeps the previous kvno's keys around.  There is no
-easy way to delete the old keys, and this flag is usually not
+Keeps the previous kvno's keys around.  This flag is usually not
 necessary except perhaps for TGS keys.  Don't use this flag unless you
 know what you're doing. This option is not supported for the LDAP database.
 .nf
@@ -584,6 +588,18 @@ history)
 KADM5_PASS_TOOSOON (current password minimum life not
 expired)
 .RE
+.fi
+.TP
+\fBpurgekeys\fP [\fB-keepkvno\fP \fIoldest_kvno_to_keep\fP] \fIprincipal\fP
+purges previously retained old keys (e.g., from
+.B change_password
+.BR -keepold )
+from
+.IR principal .
+If
+.B -keepkvno
+is specified, then only purges keys with kvnos lower than
+.IR oldest_kvno_to_keep .
 .fi
 .TP
 \fBget_principal\fP [\fB-terse\fP] \fIprincipal\fP
@@ -617,7 +633,7 @@ Key: vno 1, DES cbc mode with CRC-32, no salt
 Key: vno 1, DES cbc mode with CRC-32, Version 4
 Attributes:
 Policy: [none]
-kadmin: getprinc \-terse systest
+kadmin: getprinc -terse systest
 systest@BLEEP.COM	3	86400	604800	1
 785926535	753241234	785900000
 tlyu/admin@BLEEP.COM	786100034	0	0
@@ -639,7 +655,7 @@ names are printed.  If the expression does not contain an "@" character,
 an "@" character followed by the local realm is appended to the
 expression.  Requires the
 .I list
-priviledge.  Alias
+privilege.  Alias
 .BR listprincs ,
 .BR get_principals ,
 .BR get_princs .
@@ -654,6 +670,28 @@ test1@SECURE-TEST.OV.COM
 testuser@SECURE-TEST.OV.COM
 kadmin:
 .RE
+.fi
+.TP
+\fBget_strings\fP \fIprincipal\fP
+displays string attributes on
+.IR principal .
+String attributes are used to supply per-principal configuration to
+some KDC plugin modules.  Alias
+.BR getstrs .
+.fi
+.TP
+\fBset_string\fP \fIprincipal\fP \fIkey\fP \fIvalue\fP
+sets a string attribute on
+.IR principal .
+Alias
+.BR setstr .
+.fi
+.TP
+\fBdel_string\fP \fIprincipal\fP \fIkey\fP
+deletes a string attribute from
+.IR principal .
+Alias
+.BR delstr .
 .fi
 .TP
 \fBadd_policy\fP [\fIoptions\fP] \fIpolicy\fP
@@ -678,6 +716,23 @@ sets the minimum number of character classes allowed in a password
 .TP
 \fB\-history\fP \fInumber\fP
 sets the number of past keys kept for a principal. This option is not supported for LDAP database
+.TP
+\fB\-maxfailure\fP \fImaxnumber\fP
+sets the maximum number of authentication failures before the
+principal is locked.  Authentication failures are only tracked for
+principals which require preauthentication.
+.TP
+\fB\-failurecountinterval\fP \fIfailuretime\fP
+sets the allowable time between authentication failures.  If an
+authentication failure happens after \fIfailuretime\fP has elapsed
+since the previous failure, the number of authentication failures is
+reset to 1.  A failure count interval of 0 means forever.
+.TP
+\fB\-lockoutduration\fP \fIlockouttime\fP
+sets the duration for which the principal is locked from
+authenticating if too many authentication failures occur without the
+specified failure count interval elapsing.  A duration of 0 means
+forever.
 .sp
 .nf
 .TP
@@ -751,7 +806,7 @@ Minimum password length: 6
 Minimum number of password character classes: 2
 Number of old keys kept: 5
 Reference count: 17
-kadmin: get_policy \-terse admin
+kadmin: get_policy -terse admin
 admin	15552000	0	6	2	5	17
 kadmin:
 .TP
@@ -769,7 +824,7 @@ characters \&?, *, and []'s.  All policy names matching the expression
 are printed.  If no expression is provided, all existing policy names
 are printed.  Requires the
 .I list
-priviledge.  Alias
+privilege.  Alias
 .BR listpols ,
 .BR get_policies ,
 .BR getpols .
@@ -842,7 +897,7 @@ command.
 .RS
 .TP
 EXAMPLE:
-kadmin: ktadd \-k /tmp/foo-new-keytab host/foo.mit.edu
+kadmin: ktadd -k /tmp/foo-new-keytab host/foo.mit.edu
 Entry for principal host/foo.mit.edu@ATHENA.MIT.EDU with
 	kvno 3, encryption type DES-CBC-CRC added to keytab
 	WRFILE:/tmp/foo-new-keytab
@@ -859,7 +914,7 @@ with the highest kvno are removed.  Otherwise, the value specified is
 parsed as an integer, and all entries whose kvno match that integer are
 removed.  If the
 .B \-k
-argument is not specifeid, the default keytab
+argument is not specified, the default keytab
 .I /etc/krb5.keytab
 is used.  If the
 .B \-q
@@ -869,7 +924,7 @@ option is specified, less verbose status information is displayed.
 .RS
 .TP
 EXAMPLE:
-kadmin: ktremove \-k /usr/local/var/krb5kdc/kadmind.keytab kadmin/admin
+kadmin: ktremove -k /usr/local/var/krb5kdc/kadmind.keytab kadmin/admin
 Entry for principal kadmin/admin with kvno 3 removed
 	from keytab WRFILE:/usr/local/var/krb5kdc/kadmind.keytab.
 kadmin:
@@ -913,7 +968,7 @@ passwords.
 .SH HISTORY
 The
 .B kadmin
-prorgam was originally written by Tom Yu at MIT, as an interface to the
+program was originally written by Tom Yu at MIT, as an interface to the
 OpenVision Kerberos administration program.
 .SH SEE ALSO
 .IR kerberos (1),
@@ -922,9 +977,3 @@ OpenVision Kerberos administration program.
 .SH BUGS
 .PP
 Command output needs to be cleaned up.
-
-There is no way to delete a key kept around from a "\-keepold" option
-to a password-changing command, other than to do a password change
-without the "\-keepold" option, which will of course cause problems if
-the key is a TGS key.  There will be more powerful key-manipulation
-commands in the future.

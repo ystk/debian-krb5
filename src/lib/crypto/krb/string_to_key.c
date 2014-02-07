@@ -25,17 +25,7 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include "k5-int.h"
-#include "etypes.h"
-
-krb5_error_code KRB5_CALLCONV
-krb5_c_string_to_key_with_params(krb5_context context,
-                                 krb5_enctype enctype,
-                                 const krb5_data *string,
-                                 const krb5_data *salt,
-                                 const krb5_data *params,
-                                 krb5_keyblock *key);
-
+#include "crypto_int.h"
 
 krb5_error_code KRB5_CALLCONV
 krb5_c_string_to_key(krb5_context context, krb5_enctype enctype,

@@ -58,6 +58,7 @@
 #include <ctype.h>
 
 #include <gssapi/gssapi_generic.h>
+#include <gssapi/gssapi_krb5.h>
 #include "gss-misc.h"
 
 #ifdef HAVE_STRING_H
@@ -65,6 +66,11 @@
 #else
 #include <strings.h>
 #endif
+
+static OM_uint32
+enumerateAttributes(OM_uint32 *minor, gss_name_t name, int noisy);
+static OM_uint32
+showLocalIdentity(OM_uint32 *minor, gss_name_t name);
 
 static void
 usage()
@@ -75,7 +81,8 @@ usage()
 #endif
     fprintf(stderr, "\n");
     fprintf(stderr,
-            "       [-inetd] [-export] [-logfile file] service_name\n");
+            "       [-inetd] [-export] [-logfile file] [-keytab keytab]\n"
+            "       service_name\n");
     exit(1);
 }
 
@@ -102,6 +109,7 @@ int     verbose = 0;
  * fails, an error message is displayed and -1 is returned; otherwise,
  * 0 is returned.
  */
+
 static int
 server_acquire_creds(char *service_name, gss_cred_id_t *server_creds)
 {
@@ -119,7 +127,7 @@ server_acquire_creds(char *service_name, gss_cred_id_t *server_creds)
     }
 
     maj_stat = gss_acquire_cred(&min_stat, server_name, 0,
-                                GSS_C_NULL_OID_SET, GSS_C_ACCEPT,
+                                GSS_C_NO_OID_SET, GSS_C_ACCEPT,
                                 server_creds, NULL, NULL);
     if (maj_stat != GSS_S_COMPLETE) {
         display_status("acquiring credentials", maj_stat, min_stat);
@@ -260,6 +268,8 @@ server_establish_context(int s, gss_cred_id_t server_creds,
             display_status("displaying name", maj_stat, min_stat);
             return -1;
         }
+        enumerateAttributes(&min_stat, client, TRUE);
+        showLocalIdentity(&min_stat, client);
         maj_stat = gss_release_name(&min_stat, &client);
         if (maj_stat != GSS_S_COMPLETE) {
             display_status("releasing name", maj_stat, min_stat);
@@ -310,12 +320,12 @@ create_socket(u_short port)
     (void) setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char *) &on, sizeof(on));
     if (bind(s, (struct sockaddr *) &saddr, sizeof(saddr)) < 0) {
         perror("binding socket");
-        (void) close(s);
+        (void) closesocket(s);
         return -1;
     }
     if (listen(s, 5) < 0) {
         perror("listening on socket");
-        (void) close(s);
+        (void) closesocket(s);
         return -1;
     }
     return s;
@@ -405,12 +415,14 @@ test_import_export_context(gss_ctx_id_t *context)
 static int
 sign_server(int s, gss_cred_id_t server_creds, int export)
 {
-    gss_buffer_desc client_name, xmit_buf, msg_buf;
+    gss_buffer_desc client_name, recv_buf, unwrap_buf, mic_buf, *msg_buf, *send_buf;
     gss_ctx_id_t context;
     OM_uint32 maj_stat, min_stat;
-    int     i, conf_state, ret_flags;
+    int     i, conf_state;
+    OM_uint32 ret_flags;
     char   *cp;
     int     token_flags;
+    int     send_flags;
 
     /* Establish a context with the client */
     if (server_establish_context(s, server_creds, &context,
@@ -433,22 +445,22 @@ sign_server(int s, gss_cred_id_t server_creds, int export)
 
     do {
         /* Receive the message token */
-        if (recv_token(s, &token_flags, &xmit_buf) < 0)
+        if (recv_token(s, &token_flags, &recv_buf) < 0)
             return (-1);
 
         if (token_flags & TOKEN_NOOP) {
             if (logfile)
                 fprintf(logfile, "NOOP token\n");
-            if (xmit_buf.value) {
-                free(xmit_buf.value);
-                xmit_buf.value = 0;
+            if (recv_buf.value) {
+                free(recv_buf.value);
+                recv_buf.value = 0;
             }
             break;
         }
 
         if (verbose && logfile) {
             fprintf(logfile, "Message token (flags=%d):\n", token_flags);
-            print_token(&xmit_buf);
+            print_token(&recv_buf);
         }
 
         if ((context == GSS_C_NO_CONTEXT) &&
@@ -457,77 +469,81 @@ sign_server(int s, gss_cred_id_t server_creds, int export)
             if (logfile)
                 fprintf(logfile,
                         "Unauthenticated client requested authenticated services!\n");
-            if (xmit_buf.value) {
-                free(xmit_buf.value);
-                xmit_buf.value = 0;
+            if (recv_buf.value) {
+                free(recv_buf.value);
+                recv_buf.value = 0;
             }
             return (-1);
         }
 
         if (token_flags & TOKEN_WRAPPED) {
-            maj_stat = gss_unwrap(&min_stat, context, &xmit_buf, &msg_buf,
+            maj_stat = gss_unwrap(&min_stat, context, &recv_buf, &unwrap_buf,
                                   &conf_state, (gss_qop_t *) NULL);
             if (maj_stat != GSS_S_COMPLETE) {
                 display_status("unsealing message", maj_stat, min_stat);
-                if (xmit_buf.value) {
-                    free(xmit_buf.value);
-                    xmit_buf.value = 0;
+                if (recv_buf.value) {
+                    free(recv_buf.value);
+                    recv_buf.value = 0;
                 }
                 return (-1);
             } else if (!conf_state && (token_flags & TOKEN_ENCRYPTED)) {
                 fprintf(stderr, "Warning!  Message not encrypted.\n");
             }
 
-            if (xmit_buf.value) {
-                free(xmit_buf.value);
-                xmit_buf.value = 0;
+            if (recv_buf.value) {
+                free(recv_buf.value);
+                recv_buf.value = 0;
             }
+            msg_buf = &unwrap_buf;
         } else {
-            msg_buf = xmit_buf;
+            unwrap_buf.value = NULL;
+            unwrap_buf.length = 0;
+            msg_buf = &recv_buf;
         }
 
         if (logfile) {
             fprintf(logfile, "Received message: ");
-            cp = msg_buf.value;
+            cp = msg_buf->value;
             if ((isprint((int) cp[0]) || isspace((int) cp[0])) &&
                 (isprint((int) cp[1]) || isspace((int) cp[1]))) {
-                fprintf(logfile, "\"%.*s\"\n", (int) msg_buf.length,
-                        (char *) msg_buf.value);
+                fprintf(logfile, "\"%.*s\"\n", (int) msg_buf->length,
+                        (char *) msg_buf->value);
             } else {
                 fprintf(logfile, "\n");
-                print_token(&msg_buf);
+                print_token(msg_buf);
             }
         }
 
         if (token_flags & TOKEN_SEND_MIC) {
             /* Produce a signature block for the message */
             maj_stat = gss_get_mic(&min_stat, context, GSS_C_QOP_DEFAULT,
-                                   &msg_buf, &xmit_buf);
+                                   msg_buf, &mic_buf);
             if (maj_stat != GSS_S_COMPLETE) {
                 display_status("signing message", maj_stat, min_stat);
                 return (-1);
             }
-
-            if (msg_buf.value) {
-                free(msg_buf.value);
-                msg_buf.value = 0;
-            }
-
-            /* Send the signature block to the client */
-            if (send_token(s, TOKEN_MIC, &xmit_buf) < 0)
-                return (-1);
-
-            if (xmit_buf.value) {
-                free(xmit_buf.value);
-                xmit_buf.value = 0;
-            }
+            send_flags = TOKEN_MIC;
+            send_buf = &mic_buf;
         } else {
-            if (msg_buf.value) {
-                free(msg_buf.value);
-                msg_buf.value = 0;
-            }
-            if (send_token(s, TOKEN_NOOP, empty_token) < 0)
-                return (-1);
+            mic_buf.value = NULL;
+            mic_buf.length = 0;
+            send_flags = TOKEN_NOOP;
+            send_buf = empty_token;
+        }
+        if (recv_buf.value) {
+            free(recv_buf.value);
+            recv_buf.value = NULL;
+        }
+        if (unwrap_buf.value) {
+            gss_release_buffer(&min_stat, &unwrap_buf);
+        }
+
+        /* Send the signature block or NOOP to the client */
+        if (send_token(s, send_flags, send_buf) < 0)
+            return (-1);
+
+        if (mic_buf.value) {
+            gss_release_buffer(&min_stat, &mic_buf);
         }
     } while (1 /* loop will break if NOOP received */ );
 
@@ -690,6 +706,15 @@ main(int argc, char **argv)
                     exit(1);
                 }
             }
+        } else if (strcmp(*argv, "-keytab") == 0) {
+            argc--;
+            argv++;
+            if (!argc)
+                usage();
+            if (krb5_gss_register_acceptor_identity(*argv)) {
+                fprintf(stderr, "failed to register keytab\n");
+                exit(1);
+            }
         } else
             break;
         argc--;
@@ -731,6 +756,7 @@ main(int argc, char **argv)
         if ((stmp = create_socket(port)) >= 0) {
             if (listen(stmp, max_threads == 1 ? 0 : max_threads) < 0)
                 perror("listening on socket");
+            fprintf(stderr, "starting...\n");
 
             do {
                 struct _work_plan *work = malloc(sizeof(struct _work_plan));
@@ -783,4 +809,93 @@ main(int argc, char **argv)
 #endif
 
     return 0;
+}
+
+static void
+dumpAttribute(OM_uint32 *minor,
+              gss_name_t name,
+              gss_buffer_t attribute,
+              int noisy)
+{
+    OM_uint32 major, tmp;
+    gss_buffer_desc value;
+    gss_buffer_desc display_value;
+    int authenticated = 0;
+    int complete = 0;
+    int more = -1;
+    unsigned int i;
+
+    while (more != 0) {
+        value.value = NULL;
+        display_value.value = NULL;
+
+        major = gss_get_name_attribute(minor, name, attribute, &authenticated,
+                                       &complete, &value, &display_value,
+                                       &more);
+        if (GSS_ERROR(major)) {
+            display_status("gss_get_name_attribute", major, *minor);
+            break;
+        }
+
+        printf("Attribute %.*s %s %s\n\n%.*s\n",
+               (int)attribute->length, (char *)attribute->value,
+               authenticated ? "Authenticated" : "",
+               complete ? "Complete" : "",
+               (int)display_value.length, (char *)display_value.value);
+
+        if (noisy) {
+            for (i = 0; i < value.length; i++) {
+                if ((i % 32) == 0)
+                    printf("\n");
+                printf("%02x", ((char *)value.value)[i] & 0xFF);
+            }
+            printf("\n\n");
+        }
+
+        gss_release_buffer(&tmp, &value);
+        gss_release_buffer(&tmp, &display_value);
+    }
+}
+
+static OM_uint32
+enumerateAttributes(OM_uint32 *minor,
+                    gss_name_t name,
+                    int noisy)
+{
+    OM_uint32 major, tmp;
+    int name_is_MN;
+    gss_OID mech = GSS_C_NO_OID;
+    gss_buffer_set_t attrs = GSS_C_NO_BUFFER_SET;
+    unsigned int i;
+
+    major = gss_inquire_name(minor, name, &name_is_MN, &mech, &attrs);
+    if (GSS_ERROR(major)) {
+        display_status("gss_inquire_name", major, *minor);
+        return major;
+    }
+
+    if (attrs != GSS_C_NO_BUFFER_SET) {
+        for (i = 0; i < attrs->count; i++)
+            dumpAttribute(minor, name, &attrs->elements[i], noisy);
+    }
+
+    gss_release_oid(&tmp, &mech);
+    gss_release_buffer_set(&tmp, &attrs);
+
+    return major;
+}
+
+static OM_uint32
+showLocalIdentity(OM_uint32 *minor, gss_name_t name)
+{
+    OM_uint32 major;
+    gss_buffer_desc localname;
+
+    major = gss_localname(minor, name, GSS_C_NO_OID, &localname);
+    if (major == GSS_S_COMPLETE)
+        printf("localname: %-*s\n", localname.length, localname.value);
+    else if (major != GSS_S_UNAVAILABLE)
+        display_status("gss_localname", major, *minor);
+    gss_release_buffer(minor, &localname);
+    return major;
 }

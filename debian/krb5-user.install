@@ -16,3 +16,5 @@ usr/bin/kadmin
 usr/share/man/man1/kadmin.1
 usr/bin/ktutil
 usr/share/man/man1/ktutil.1
+usr/bin/kswitch
+usr/share/man/man1/kswitch.1

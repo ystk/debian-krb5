@@ -1,4 +1,29 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* tests/asn.1/krb5_decode_test.c */
+/*
+ * Copyright (C) 1994 by the Massachusetts Institute of Technology.
+ * All rights reserved.
+ *
+ * Export of this software from the United States of America may
+ *   require a specific license from the United States Government.
+ *   It is the responsibility of any person or organization contemplating
+ *   export to obtain such a license before exporting.
+ *
+ * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
+ * distribute this software and its documentation for any purpose and
+ * without fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright notice and
+ * this permission notice appear in supporting documentation, and that
+ * the name of M.I.T. not be used in advertising or publicity pertaining
+ * to distribution of the software without specific, written prior
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is" without express
+ * or implied warranty.
+ */
+
 #include "k5-int.h"
 #include "ktest.h"
 #include "com_err.h"
@@ -863,6 +888,10 @@ int main(argc, argv)
     {
         setup(krb5_enc_data,"krb5_enc_data",ktest_make_sample_enc_data);
         decode_run("enc_data","","30 23 A0 03 02 01 00 A1 03 02 01 05 A2 17 04 15 6B 72 62 41 53 4E 2E 31 20 74 65 73 74 20 6D 65 73 73 61 67 65",decode_krb5_enc_data,ktest_equal_enc_data,krb5_ktest_free_enc_data);
+        ref.kvno = 0xFF000000;
+        decode_run("enc_data","(MSB-set kvno)","30 26 A0 03 02 01 00 A1 06 02 04 FF 00 00 00 A2 17 04 15 6B 72 62 41 53 4E 2E 31 20 74 65 73 74 20 6D 65 73 73 61 67 65",decode_krb5_enc_data,ktest_equal_enc_data,krb5_ktest_free_enc_data);
+        ref.kvno = 0xFFFFFFFF;
+        decode_run("enc_data","(kvno=-1)","30 23 A0 03 02 01 00 A1 03 02 01 FF A2 17 04 15 6B 72 62 41 53 4E 2E 31 20 74 65 73 74 20 6D 65 73 73 61 67 65",decode_krb5_enc_data,ktest_equal_enc_data,krb5_ktest_free_enc_data);
         ktest_destroy_enc_data(&ref);
     }
 
@@ -914,6 +943,22 @@ int main(argc, argv)
         setup(krb5_ad_signedpath,"krb5_ad_signedpath",ktest_make_sample_ad_signedpath);
         decode_run("ad_signedpath","","30 3E A0 03 02 01 01 A1 0F 30 0D A0 03 02 01 01 A1 06 04 04 31 32 33 34 A3 26 30 24 30 10 A1 03 02 01 0D A2 09 04 07 70 61 2D 64 61 74 61 30 10 A1 03 02 01 0D A2 09 04 07 70 61 2D 64 61 74 61",decode_krb5_ad_signedpath,ktest_equal_ad_signedpath,krb5_free_ad_signedpath);
         ktest_empty_ad_signedpath(&ref);
+    }
+
+    /****************************************************************/
+    /* decode_iakerb_header */
+    {
+        setup(krb5_iakerb_header,"krb5_iakerb_header",ktest_make_sample_iakerb_header);
+        decode_run("iakerb_header","","30 18 A1 0A 04 08 6B 72 62 35 64 61 74 61 A2 0A 04 08 6B 72 62 35 64 61 74 61",decode_krb5_iakerb_header,ktest_equal_iakerb_header,krb5_free_iakerb_header);
+        ktest_empty_iakerb_header(&ref);
+    }
+
+    /****************************************************************/
+    /* decode_iakerb_finished */
+    {
+        setup(krb5_iakerb_finished,"krb5_iakerb_finished",ktest_make_sample_iakerb_finished);
+        decode_run("iakerb_finished","","30 11 A1 0F 30 0D A0 03 02 01 01 A1 06 04 04 31 32 33 34",decode_krb5_iakerb_finished,ktest_equal_iakerb_finished,krb5_free_iakerb_finished);
+        ktest_empty_iakerb_finished(&ref);
     }
 
 #ifdef ENABLE_LDAP

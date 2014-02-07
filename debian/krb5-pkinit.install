@@ -1,2 +1,2 @@
-usr/lib/krb5/plugins/preauth/pkinit.so
+usr/lib/*/krb5/plugins/preauth/pkinit.so
 

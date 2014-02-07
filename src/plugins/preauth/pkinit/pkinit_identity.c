@@ -93,6 +93,9 @@ idtype2string(int idtype)
     case IDTYPE_PKCS11: return "PKCS11"; break;
     case IDTYPE_PKCS12: return "PKCS12"; break;
     case IDTYPE_ENVVAR: return "ENV"; break;
+#ifdef PKINIT_CRYPTO_IMPL_NSS
+    case IDTYPE_NSS: return "NSS"; break;
+#endif
     default: return "INVALID"; break;
     }
 }
@@ -411,12 +414,16 @@ process_option_identity(krb5_context context,
             idtype = IDTYPE_DIR;
         } else if (strncmp(value, "ENV:", typelen) == 0) {
             idtype = IDTYPE_ENVVAR;
+#ifdef PKINIT_CRYPTO_IMPL_NSS
+        } else if (strncmp(value, "NSS:", typelen) == 0) {
+            idtype = IDTYPE_NSS;
+#endif
         } else {
             pkiDebug("%s: Unsupported type while processing '%s'\n",
                      __FUNCTION__, value);
             krb5_set_error_message(context, KRB5_PREAUTH_FAILED,
-                                   "Unsupported type while processing '%s'\n",
-                                   value);
+                                   _("Unsupported type while processing "
+                                     "'%s'\n"), value);
             return KRB5_PREAUTH_FAILED;
         }
     } else {
@@ -447,9 +454,17 @@ process_option_identity(krb5_context context,
         if (idopts->cert_filename == NULL)
             retval = ENOMEM;
         break;
+#ifdef PKINIT_CRYPTO_IMPL_NSS
+    case IDTYPE_NSS:
+        idopts->cert_filename = strdup(residual);
+        if (idopts->cert_filename == NULL)
+            retval = ENOMEM;
+        break;
+#endif
     default:
         krb5_set_error_message(context, KRB5_PREAUTH_FAILED,
-                               "Internal error parsing X509_user_identity\n");
+                               _("Internal error parsing "
+                                 "X509_user_identity\n"));
         retval = EINVAL;
         break;
     }
@@ -482,6 +497,10 @@ process_option_ca_crl(krb5_context context,
         idtype = IDTYPE_FILE;
     } else if (strncmp(value, "DIR:", typelen) == 0) {
         idtype = IDTYPE_DIR;
+#ifdef PKINIT_CRYPTO_IMPL_NSS
+    } else if (strncmp(value, "NSS:", typelen) == 0) {
+        idtype = IDTYPE_NSS;
+#endif
     } else {
         return ENOTSUP;
     }

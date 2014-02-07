@@ -1,5 +1,8 @@
 libkrb5support.so.0 libkrb5support0 #MINVER#
  HIDDEN@HIDDEN 1.7dfsg~beta2
+ k5_path_isabs@krb5support_0_MIT 1.10+dfsg~alpha1
+ k5_path_join@krb5support_0_MIT 1.10+dfsg~alpha1
+ k5_path_split@krb5support_0_MIT 1.10+dfsg~alpha1
  krb5int_buf_add@krb5support_0_MIT 1.7dfsg~beta2
  krb5int_buf_add_fmt@krb5support_0_MIT 1.7dfsg~beta2
  krb5int_buf_add_len@krb5support_0_MIT 1.7dfsg~beta2

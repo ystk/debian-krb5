@@ -20,7 +20,6 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
  */
 
 #ifndef GSSAPI_EXT_H_
@@ -32,20 +31,100 @@
 extern "C" {
 #endif /* __cplusplus */
 
-#if 0
 /*
  * Solaris extensions
  */
-int KRB5_CALLCONV gssd_pname_to_uid
-	(char *,
-	 gss_OID,
-	 gss_OID,
-	 uid_t *);
-
-int KRB5_CALLCONV __gss_userok
-	(const gss_name_t /*name*/,
-	 const char * /*username*/);
+#ifndef _WIN32
+OM_uint32 KRB5_CALLCONV
+gss_pname_to_uid
+	(OM_uint32 *minor,
+         const gss_name_t name,
+	 const gss_OID mech_type,
+	 uid_t *uidOut);
 #endif
+
+/**
+ * Provides a platform-specific name for a GSSAPI name as interpreted by a
+ * given mechanism.
+ *
+ * @param name       The gss name resulting from accept_sec_context
+ * @param mech_type  The mechanism that will be asked to map @a name to a
+ *                   local name
+ * @param localname  Pointer to a buffer_desc allocated by the caller
+ *                   that will be filled in with the local name on successful
+ *                   completion.
+ */
+OM_uint32 KRB5_CALLCONV
+gss_localname
+	(OM_uint32 *minor,
+	 const gss_name_t name,
+	 gss_const_OID mech_type,
+	 gss_buffer_t localname);
+
+/** Determine whether a mechanism name is authorized to act as a username.
+ *
+ * @param [in] name      Mechanism name
+ * @param [in] username  System username
+ *
+ * This is a simple wrapper around gss_authorize_localname().  It only supports
+ * system usernames as local names, and cannot distinguish between lack of
+ * authorization and other errors.
+ *
+ * @retval 1 @a name is authorized to act as @a username
+ * @retval 0 @a name is not authorized or an error occurred
+ */
+int KRB5_CALLCONV
+gss_userok(const gss_name_t name,
+           const char *username);
+
+/** Determine whether a mechanism name is authorized to act as a local name.
+ *
+ * @param [out] minor  Minor status code
+ * @param [in] name    Mechanism name
+ * @param [in] user    Local name
+ *
+ * @a name is a mechanism name, typically the result of a completed
+ * gss_accept_sec_context().  @a user is an internal name representing a local
+ * name, such as a name imported by gss_import_name() with an @a
+ * input_name_type of @c GSS_C_NT_USER_NAME.
+ *
+ * @return Return GSS_S_COMPLETE if @a name is authorized to act as @a user,
+ * GSS_S_UNAUTHORIZED if not, or an appropriate GSS error code if an error
+ * occured.
+ *
+ * @sa gss_userok
+ */
+OM_uint32 KRB5_CALLCONV
+gss_authorize_localname(OM_uint32 *minor,
+                        const gss_name_t name,
+                        const gss_name_t user);
+
+OM_uint32 KRB5_CALLCONV
+gss_acquire_cred_with_password(
+    OM_uint32 *,        /* minor_status */
+    const gss_name_t,   /* desired_name */
+    const gss_buffer_t, /* password */
+    OM_uint32,          /* time_req */
+    const gss_OID_set,  /* desired_mechs */
+    gss_cred_usage_t,   /* cred_usage */
+    gss_cred_id_t *,    /* output_cred_handle */
+    gss_OID_set *,      /* actual_mechs */
+    OM_uint32 *);       /* time_rec */
+
+OM_uint32 KRB5_CALLCONV
+gss_add_cred_with_password(
+    OM_uint32 *,        /* minor_status */
+    const gss_cred_id_t,/* input_cred_handle */
+    const gss_name_t,   /* desired_name */
+    const gss_OID,      /* desired_mech */
+    const gss_buffer_t, /* password */
+    gss_cred_usage_t,   /* cred_usage */
+    OM_uint32,          /* initiator_time_req */
+    OM_uint32,          /* acceptor_time_req */
+    gss_cred_id_t *,    /* output_cred_handle */
+    gss_OID_set *,      /* actual_mechs */
+    OM_uint32 *,        /* initiator_time_rec */
+    OM_uint32 *);       /* acceptor_time_rec */
 
 /*
  * GGF extensions
@@ -88,10 +167,9 @@ OM_uint32 KRB5_CALLCONV gss_set_sec_context_option
 	 const gss_OID /*desired_object*/,
 	 const gss_buffer_t /*value*/);
 
-/* XXX do these really belong in this header? */
-OM_uint32 KRB5_CALLCONV gssspi_set_cred_option
+OM_uint32 KRB5_CALLCONV gss_set_cred_option
 	(OM_uint32 * /*minor_status*/,
-	 gss_cred_id_t /*cred*/,
+	 gss_cred_id_t * /*cred*/,
 	 const gss_OID /*desired_object*/,
 	 const gss_buffer_t /*value*/);
 
@@ -287,6 +365,8 @@ gss_add_cred_impersonate_name(
 /*
  * Naming extensions
  */
+GSS_DLLIMP extern gss_buffer_t GSS_C_ATTR_LOCAL_LOGIN_USER;
+
 OM_uint32 KRB5_CALLCONV gss_display_name_ext
 (
     OM_uint32 *,	/* minor_status */
@@ -356,6 +436,27 @@ OM_uint32 KRB5_CALLCONV gss_release_any_name_mapping
     gss_name_t,		/* name */
     gss_buffer_t,	/* type_id */
     gss_any_t *		/* input */
+);
+
+/* draft-josefsson-gss-capsulate */
+OM_uint32 KRB5_CALLCONV gss_encapsulate_token
+(
+    gss_const_buffer_t, /* input_token */
+    gss_const_OID,      /* token_oid */
+    gss_buffer_t        /* output_token */
+);
+
+OM_uint32 KRB5_CALLCONV gss_decapsulate_token
+(
+    gss_const_buffer_t, /* input_token */
+    gss_const_OID,      /* token_oid */
+    gss_buffer_t        /* output_token */
+);
+
+int KRB5_CALLCONV gss_oid_equal
+(
+    gss_const_OID,      /* first_oid */
+    gss_const_OID       /* second_oid */
 );
 
 #ifdef __cplusplus

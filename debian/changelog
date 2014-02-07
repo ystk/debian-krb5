@@ -1,3 +1,269 @@
+krb5 (1.10.1+dfsg-5+deb7u1) stable-security; urgency=high
+
+  * Non-maintainer upload by the Security Team.
+  * Fix cve-2002-2443: denial-of-service issue due to improper UDP packet
+    validation (closes: #708267).
+
+ -- Michael Gilbert <mgilbert@debian.org>  Thu, 30 May 2013 01:03:26 +0000
+
+krb5 (1.10.1+dfsg-5) unstable; urgency=high
+
+  * Import workaround for getaddrinfo bug from upstream.  Described in
+    upstream's RT 7124, Closes: #704647
+  * Correct CVE number for CVE-2012-1016 in changelog and patches, Closes:
+    #703457
+  * Import upstream's fix for CVE-2013-1416, Closes: #704775
+
+ -- Benjamin Kaduk <kaduk@mit.edu>  Fri, 05 Apr 2013 14:36:50 -0400
+
+krb5 (1.10.1+dfsg-4+nmu1) unstable; urgency=high
+
+  * Non-maintainer upload by the Security Team.
+  * Fix cve-2012-1016: null pointer derefence when handling a draft9 request
+    (closes: #702633).
+
+ -- Michael Gilbert <mgilbert@debian.org>  Fri, 15 Mar 2013 04:15:27 +0000
+
+krb5 (1.10.1+dfsg-4) unstable; urgency=high
+
+  * KDC null pointer dereference with PKINIT, CVE-2013-1415
+
+ -- Benjamin Kaduk <kaduk@mit.edu>  Fri, 15 Feb 2013 16:07:53 -0500
+
+krb5 (1.10.1+dfsg-3) unstable; urgency=low
+
+  * Kadmind crash only triggered by admin users, cve-2012-1013, Closes:
+    #687647
+  * Don't unload GSS-API plugins to avoid crashing applications that use
+    GSS-API on systems with plugins installed, Closes: #693741
+
+ -- Sam Hartman <hartmans@debian.org>  Mon, 19 Nov 2012 17:35:04 -0500
+
+krb5 (1.10.1+dfsg-2) unstable; urgency=high
+
+  * MITKRB5-SA-2012-001 [CVE-2012-1014 CVE-2012-1015] KDC frees
+    uninitialized pointers
+  * Break libgssglue1 << 0.2-2 for multiarch, Closes: #680612
+  * Don't free caller's principal in verify_init_creds, Closes: #512410
+
+ -- Sam Hartman <hartmans@debian.org>  Tue, 31 Jul 2012 08:20:09 -0400
+
+krb5 (1.10.1+dfsg-1) unstable; urgency=low
+
+  *  New Upstream Version
+    - Set display_name in gss_get_name_attribute, Closes: #658514
+  * Fix use counts on preauthentication, Closes: #670457
+  * Fix kadmin access controls, Closes: #670918
+  * Accept NMU with longer hostname, Closes: #657027
+  * Fix history from old databases, Closes: #660869
+  * Fix gcc 4.6.2 may be used uninitialized warnings/errors, Closes: #672075
+  * Check all keys in keytab for verifying credentials, Possibly fixes:
+    #669127
+  * Avoid multi-arch libpath in krb5-config, Closes: #642229
+      * Debconf translations:
+    - Turkish debconf Translation, Thanks Atila KOC, Closes: #659072
+    - Polish, thanks Michal/ Kul/ach, Closes: #658437
+
+ -- Sam Hartman <hartmans@debian.org>  Thu, 10 May 2012 16:32:13 -0400
+
+krb5 (1.10+dfsg~beta1-2.1) unstable; urgency=low
+
+  * Non-maintainer upload.
+  * Apply patch from Svante Signell to fix FTBFS on hurd-i386, Closes: #657027.
+
+ -- Samuel Thibault <sthibault@debian.org>  Thu, 26 Apr 2012 00:52:37 +0200
+
+krb5 (1.10+dfsg~beta1-2) unstable; urgency=low
+
+  * Oops, actually fix build flags, Closes: #655248
+
+ -- Sam Hartman <hartmans@debian.org>  Fri, 13 Jan 2012 17:39:34 -0500
+
+krb5 (1.10+dfsg~beta1-1) unstable; urgency=low
+
+  * New Upstream version
+  * Fix hardening flags and pre-dpkg-buildflags support, Closes: #655248
+  * Update some symbols files for enhanced functions in 1.10
+
+ -- Sam Hartman <hartmans@debian.org>  Fri, 13 Jan 2012 17:11:39 -0500
+
+krb5 (1.10+dfsg~alpha2-1) unstable; urgency=low
+
+  * New upstream Version
+
+ -- Sam Hartman <hartmans@debian.org>  Tue, 27 Dec 2011 06:02:35 -0500
+
+krb5 (1.10+dfsg~alpha1-7) unstable; urgency=high
+
+  * Merge in github/krb5-1-10 branch up through 12/16/2010: many new
+    upstream changes
+  * Includes fix for MITKRB5-SA-2011-007 KDC null pointer
+    dereference in TGS handling [CVE-2011-1530]
+    , Closes: #651226
+
+ -- Sam Hartman <hartmans@debian.org>  Fri, 16 Dec 2011 15:30:18 -0500
+
+krb5 (1.10+dfsg~alpha1-6) unstable; urgency=low
+
+  * Fix segfault with unknown hostnames in krb5_sname_to_principal,
+    Closes: #650671
+  * Indicate that this library breaks libsmbclient versions that depend on
+    krb5_locate_kdc, Closes: #650603, #650611
+
+ -- Sam Hartman <hartmans@debian.org>  Thu, 01 Dec 2011 19:34:41 -0500
+
+krb5 (1.10+dfsg~alpha1-5) unstable; urgency=low
+
+  * Add texinfo back to build depends: policy has been subverted by the
+    evil forces of wishful thinking and forward progress
+  * Conflict: with libkrb53 again. The transition is over and we no longer
+    need that package.
+
+ -- Sam Hartman <hartmans@debian.org>  Wed, 30 Nov 2011 09:09:55 -0500
+
+krb5 (1.10+dfsg~alpha1-4) unstable; urgency=low
+
+  * Add kadmind and krb5kdc pidfiles, Closes: #550781
+  * Respect locale in time display, Closes: #138430
+  * Status action for init scripts, Thanks Yukio Shiiya, Closes: #645363,
+    #645364
+  * Fix dependencies for krb5-kdc
+  * Add dpkg-buildflags support
+  * Initial build-arch and build-indep support: currently build-indep
+    depends on build-arch but that's OK as a starting point
+
+ -- Sam Hartman <hartmans@debian.org>  Tue, 29 Nov 2011 20:34:03 -0500
+
+krb5 (1.10+dfsg~alpha1-3) unstable; urgency=low
+
+  * Build depend on pkg-config
+
+
+ -- Sam Hartman <hartmans@debian.org>  Tue, 29 Nov 2011 17:35:48 -0500
+
+krb5 (1.10+dfsg~alpha1-2) unstable; urgency=low
+
+  * LDAP plugin depends on ldap library for parallel builds
+
+ -- Sam Hartman <hartmans@debian.org>  Tue, 29 Nov 2011 17:35:30 -0500
+
+krb5 (1.10+dfsg~alpha1-1) unstable; urgency=low
+
+  * New upstream release
+  
+    - mit-krb5-sa-2011-006, Closes: #646367
+    - Install k5login.5 not just .k5login.5, Closes: #623068
+      - Fixes LDAP file descriptor leak, Closes: #561176
+  * Updated translations:
+      - French, Thanks Christian Perrier, Closes: #630827
+      - Catalan, Thanks Innocent De Marchi, Closes: #632208
+    * Update to krb5-1-10 branch of 2011-11-28
+
+ -- Sam Hartman <hartmans@debian.org>  Tue, 29 Nov 2011 13:05:17 -0500
+
+krb5 (1.9.1+dfsg-3) unstable; urgency=low
+
+  * New function gss_localname from trunk
+
+ -- Sam Hartman <hartmans@debian.org>  Wed, 21 Sep 2011 16:53:47 -0400
+
+krb5 (1.9.1+dfsg-2) unstable; urgency=low
+
+  * Revert incorrect Danish translations
+  * Multiarch support, Thanks Steve  Langasek, Closes: #634121
+  * Use linux-any in debian/control instead of explicit exclusions,
+    Closes: #634311
+  * Apply upstream r24977 in order to fix problems where a name exists
+    for v6 but not v4, Closes: #532536
+  * Apply upstream tickets 6916 and 6917 to fi x referrals behavior with
+    old KDCs, Closes: #631106
+
+ -- Sam Hartman <hartmans@debian.org>  Tue, 09 Aug 2011 11:52:04 -0400
+
+krb5 (1.9.1+dfsg-1) unstable; urgency=low
+
+  * New upstream version
+  * Fix g_make_token_header when no token type is passed
+  * Support absolute paths for GSS-API mechanisms
+  * Add gss_authorize_localname, gss_userok,  gss_pname_to_uid
+  * Fix gss_acquire_cred handling with empty mech set; fix
+    accept_sec_context handling in this case too
+  * Permit importing anonymous name with empty buffer
+      * New Translations:
+    - Dutch: Thanks  Vincent Zweije, Closes: #624173
+    - Danish, Thanks  Joe Dalton, Closes: #626530
+  * Fix kadmin free of null pointer on change password, Closes: #622681
+
+ -- Sam Hartman <hartmans@debian.org>  Thu, 02 Jun 2011 10:57:10 -0400
+
+krb5 (1.9+dfsg-2) unstable; urgency=low
+
+  * In the interest of testing other GSS-API mechanisms it is desirable to
+    install the gss-server and gss-client application. These are useful to
+    people developing new GSS-API mechanisms within Debian.
+
+ -- Sam Hartman <hartmans@debian.org>  Wed, 04 May 2011 16:07:42 -0400
+
+krb5 (1.9+dfsg-1) unstable; urgency=low
+
+  * New upstream version
+  *  Pull in krb5 1.9 branch as of 03/16/2011
+    - Include updates in 1.8.3+dfsg-4, 1.8.3+dfsg-5, 1.8.3+dfsg-6
+    - Include fixes for trace logging
+  * Since Debian does not and will not ever build with edirectory
+    support, remove documentation of edirectory commands from the man
+    page. Closes: #580502
+  * Includes IPv6 support for kadmind, Closes: #595796
+  * Upstream 1.9 supports hooks for password change and synchronization,
+    Closes: #588968
+  * LDAP now supports stash creation after db cretaion, Closes: #484808
+  * Krb5 1.9 supports including files from krb5.conf, Closes: #429692
+
+ -- Sam Hartman <hartmans@debian.org>  Thu, 17 Mar 2011 20:54:04 -0400
+
+krb5 (1.9+dfsg~beta2-1) experimental; urgency=low
+
+  * New upstream release
+  * Fix default location of kpropd.acl in kpropd.M (LP: #688464)
+  * Ignore PACs without a server signature generated by OS X Open
+    Directory rather than failing authentication, Closes: #604925
+  * New exported API: krb5_tkt_creds_get
+
+ -- Sam Hartman <hartmans@debian.org>  Fri, 10 Dec 2010 14:30:35 -0500
+
+krb5 (1.9+dfsg~beta1-1) experimental; urgency=low
+
+  * New upstream release
+  * No longer use symbols files for libkadm5 ad libkdb5: these libraries
+    change very rapidly and tend to change soname each major release.
+    Symbols files will be introduced if they make sense again.
+  * Update symbols for libkrb5-3: note that several internal functions
+    have disappeared. These functions were not part of the public ABI
+    which remains stable
+  * Update library package names based on soname changes
+
+ -- Sam Hartman <hartmans@debian.org>  Sun, 21 Nov 2010 17:31:55 -0500
+krb5 (1.8.3+dfsg-6) unstable; urgency=low
+
+  * Fix double free with pkinit on KDC, CVE-2011-0284, Closes: #618517
+  * Updated Danish debconf translations, thanks  Joe Dalton, Closes:
+    #584282
+
+ -- Sam Hartman <hartmans@debian.org>  Wed, 16 Mar 2011 10:10:55 -0400
+
+krb5 (1.8.3+dfsg-5) unstable; urgency=low
+
+  * KDC/LDAP DOS    (CVE-2010-4022, CVE-2011-0281, and CVE-2011-0282,
+    Closes: #613487
+  * Fix delegation of credentials against Windows servers; significant
+    interoperability issue, Closes: #611906
+  * Set nt-srv-inst on TGS names to work against W2K8R2 KDCs, Closes:
+    #616429
+  * Don't fail authentication when PAC verification fails; support hmac-
+    md5 checksums even for non-RC4 keys, Closes: #616728
+
+ -- Sam Hartman <hartmans@debian.org>  Sun, 06 Mar 2011 18:08:35 -0500
+
 krb5 (1.8.3+dfsg-4) unstable; urgency=medium
 
   * Ignore PACs without a server signature generated by OS X Open

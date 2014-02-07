@@ -1,9 +1,8 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* kadmin/dbutil/dump.c - Dump a KDC database */
 /*
- * kadmin/dbutil/dump.c
- *
- * Copyright 1990,1991,2001,2006,2008,2009 by the Massachusetts Institute of Technology.
- * All Rights Reserved.
+ * Copyright 1990,1991,2001,2006,2008,2009 by the Massachusetts Institute of
+ * Technology.  All Rights Reserved.
  *
  * Export of this software from the United States of America may
  *   require a specific license from the United States Government.
@@ -23,9 +22,6 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
- * Dump a KDC database
  */
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
@@ -205,7 +201,7 @@ extern krb5_boolean     dbactive;
 extern int              exit_status;
 extern krb5_context     util_context;
 extern kadm5_config_params global_params;
-extern krb5_db_entry      master_entry;
+extern krb5_db_entry      *master_entry;
 
 /* Strings */
 
@@ -214,67 +210,53 @@ extern krb5_db_entry      master_entry;
 static const char null_mprinc_name[] = "kdb5_dump@MISSING";
 
 /* Message strings */
-#define regex_err               "%s: regular expression error - %s\n"
-#define regex_merr              "%s: regular expression match error - %s\n"
-#define pname_unp_err           "%s: cannot unparse principal name (%s)\n"
-#define mname_unp_err           "%s: cannot unparse modifier name (%s)\n"
-#define nokeys_err              "%s: cannot find any standard key for %s\n"
-#define sdump_tl_inc_err        "%s: tagged data list inconsistency for %s (counted %d, stored %d)\n"
-#define stand_fmt_name          "Kerberos version 5"
-#define old_fmt_name            "Kerberos version 5 old format"
-#define b6_fmt_name             "Kerberos version 5 beta 6 format"
-#define r1_3_fmt_name           "Kerberos version 5 release 1.3 format"
-#define ofopen_error            "%s: cannot open %s for writing (%s)\n"
-#define oflock_error            "%s: cannot lock %s (%s)\n"
-#define dumprec_err             "%s: error performing %s dump (%s)\n"
-#define dumphdr_err             "%s: error dumping %s header (%s)\n"
-#define trash_end_fmt           "%s(%d): ignoring trash at end of line: "
-#define read_name_string        "name string"
-#define read_key_type           "key type"
-#define read_key_data           "key data"
-#define read_pr_data1           "first set of principal attributes"
-#define read_mod_name           "modifier name"
-#define read_pr_data2           "second set of principal attributes"
-#define read_salt_data          "salt data"
-#define read_akey_type          "alternate key type"
-#define read_akey_data          "alternate key data"
-#define read_asalt_type         "alternate salt type"
-#define read_asalt_data         "alternate salt data"
-#define read_exp_data           "expansion data"
-#define store_err_fmt           "%s(%d): cannot store %s(%s)\n"
-#define add_princ_fmt           "%s\n"
-#define parse_err_fmt           "%s(%d): cannot parse %s (%s)\n"
-#define read_err_fmt            "%s(%d): cannot read %s\n"
-#define no_mem_fmt              "%s(%d): no memory for buffers\n"
-#define rhead_err_fmt           "%s(%d): cannot match size tokens\n"
-#define err_line_fmt            "%s: error processing line %d of %s\n"
-#define head_bad_fmt            "%s: dump header bad in %s\n"
-#define read_bytecnt            "record byte count"
-#define read_encdata            "encoded data"
-#define n_name_unp_fmt          "%s(%s): cannot unparse name\n"
-#define n_dec_cont_fmt          "%s(%s): cannot decode contents\n"
-#define read_nint_data          "principal static attributes"
-#define read_tcontents          "tagged data contents"
-#define read_ttypelen           "tagged data type and length"
-#define read_kcontents          "key data contents"
-#define read_ktypelen           "key data type and length"
-#define read_econtents          "extra data contents"
-#define k5beta_fmt_name         "Kerberos version 5 old format"
-#define standard_fmt_name       "Kerberos version 5 format"
-#define no_name_mem_fmt         "%s: cannot get memory for temporary name\n"
-#define ctx_err_fmt             "%s: cannot initialize Kerberos context\n"
-#define stdin_name              "standard input"
-#define remaster_err_fmt        "while re-encoding keys for principal %s with new master key"
-#define restfail_fmt            "%s: %s restore failed\n"
-#define close_err_fmt           "%s: cannot close database (%s)\n"
-#define dbinit_err_fmt          "%s: cannot initialize database (%s)\n"
-#define dblock_err_fmt          "%s: cannot initialize database lock (%s)\n"
-#define dbname_err_fmt          "%s: cannot set database name to %s (%s)\n"
-#define dbdelerr_fmt            "%s: cannot delete bad database %s (%s)\n"
-#define dbunlockerr_fmt         "%s: cannot unlock database %s (%s)\n"
-#define dbrenerr_fmt            "%s: cannot rename database %s to %s (%s)\n"
-#define dbcreaterr_fmt          "%s: cannot create database %s (%s)\n"
-#define dfile_err_fmt           "%s: cannot open %s (%s)\n"
+#define regex_err         _("%s: regular expression error - %s\n")
+#define regex_merr        _("%s: regular expression match error - %s\n")
+#define pname_unp_err     _("%s: cannot unparse principal name (%s)\n")
+#define mname_unp_err     _("%s: cannot unparse modifier name (%s)\n")
+#define nokeys_err        _("%s: cannot find any standard key for %s\n")
+#define sdump_tl_inc_err  _("%s: tagged data list inconsistency for %s (counted %d, stored %d)\n")
+#define ofopen_error      _("%s: cannot open %s for writing (%s)\n")
+#define oflock_error      _("%s: cannot lock %s (%s)\n")
+#define dumprec_err       _("%s: error performing %s dump (%s)\n")
+#define trash_end_fmt     _("%s(%d): ignoring trash at end of line: ")
+#define read_name_string  _("name string")
+#define read_key_type     _("key type")
+#define read_key_data     _("key data")
+#define read_pr_data1     _("first set of principal attributes")
+#define read_mod_name     _("modifier name")
+#define read_pr_data2     _("second set of principal attributes")
+#define read_salt_data    _("salt data")
+#define read_akey_type    _("alternate key type")
+#define read_akey_data    _("alternate key data")
+#define read_asalt_type   _("alternate salt type")
+#define read_asalt_data   _("alternate salt data")
+#define read_exp_data     _("expansion data")
+#define store_err_fmt     _("%s(%d): cannot store %s(%s)\n")
+#define add_princ_fmt     _("%s\n")
+#define parse_err_fmt     _("%s(%d): cannot parse %s (%s)\n")
+#define read_err_fmt      _("%s(%d): cannot read %s\n")
+#define no_mem_fmt        _("%s(%d): no memory for buffers\n")
+#define rhead_err_fmt     _("%s(%d): cannot match size tokens\n")
+#define err_line_fmt      _("%s: error processing line %d of %s\n")
+#define head_bad_fmt      _("%s: dump header bad in %s\n")
+#define read_nint_data    _("principal static attributes")
+#define read_tcontents    _("tagged data contents")
+#define read_ttypelen     _("tagged data type and length")
+#define read_kcontents    _("key data contents")
+#define read_ktypelen     _("key data type and length")
+#define read_econtents    _("extra data contents")
+#define no_name_mem_fmt   _("%s: cannot get memory for temporary name\n")
+#define ctx_err_fmt       _("%s: cannot initialize Kerberos context\n")
+#define stdin_name        _("standard input")
+#define remaster_err_fmt  _("while re-encoding keys for principal %s with new master key")
+#define restfail_fmt      _("%s: %s restore failed\n")
+#define close_err_fmt     _("%s: cannot close database (%s)\n")
+#define dbinit_err_fmt    _("%s: cannot initialize database (%s)\n")
+#define dbdelerr_fmt      _("%s: cannot delete bad database %s (%s)\n")
+#define dbunlockerr_fmt   _("%s: cannot unlock database %s (%s)\n")
+#define dbcreaterr_fmt    _("%s: cannot create database %s (%s)\n")
+#define dfile_err_fmt     _("%s: cannot open %s (%s)\n")
 
 static const char oldoption[] = "-old";
 static const char b6option[] = "-b6";
@@ -313,14 +295,11 @@ krb5_error_code master_key_convert(context, db_entry)
             krb5_keyblock   *tmp_mkey;
 
             key_data = &db_entry->key_data[i];
-            if (key_data->key_data_length == 0)
-                continue;
             retval = krb5_dbe_find_mkey(context, master_keylist, db_entry, &tmp_mkey);
             if (retval)
                 return retval;
-            retval = krb5_dbekd_decrypt_key_data(context, tmp_mkey,
-                                                 key_data, &v5plainkey,
-                                                 &keysalt);
+            retval = krb5_dbe_decrypt_key_data(context, tmp_mkey, key_data,
+                                               &v5plainkey, &keysalt);
             if (retval)
                 return retval;
 
@@ -329,10 +308,9 @@ krb5_error_code master_key_convert(context, db_entry)
             key_ptr = &v5plainkey;
             kvno = (krb5_kvno) key_data->key_data_kvno;
 
-            retval = krb5_dbekd_encrypt_key_data(context, &new_master_keyblock,
-                                                 key_ptr, &keysalt,
-                                                 (int) kvno,
-                                                 &new_key_data);
+            retval = krb5_dbe_encrypt_key_data(context, &new_master_keyblock,
+                                               key_ptr, &keysalt, (int) kvno,
+                                               &new_key_data);
             if (retval)
                 return retval;
             krb5_free_keyblock_contents(context, &v5plainkey);
@@ -364,19 +342,19 @@ void update_ok_file (file_name)
 
     if (asprintf(&file_ok, "%s%s", file_name, ok) < 0) {
         com_err(progname, ENOMEM,
-                "while allocating filename for update_ok_file");
+                _("while allocating filename for update_ok_file"));
         exit_status++;
         return;
     }
     if ((fd = open(file_ok, O_WRONLY|O_CREAT|O_TRUNC, 0600)) < 0) {
-        com_err(progname, errno, "while creating 'ok' file, '%s'",
+        com_err(progname, errno, _("while creating 'ok' file, '%s'"),
                 file_ok);
         exit_status++;
         free(file_ok);
         return;
     }
     if (write(fd, "", 1) != 1) {
-        com_err(progname, errno, "while writing to 'ok' file, '%s'",
+        com_err(progname, errno, _("while writing to 'ok' file, '%s'"),
                 file_ok);
         exit_status++;
         free(file_ok);
@@ -1056,8 +1034,8 @@ static krb5_error_code dump_ov_princ(krb5_pointer ptr, krb5_db_entry *kdb)
             if (key_data->key_data_type[0] != ENCTYPE_DES_CBC_CRC)
                 continue;
             if (foundcrc) {
-                fprintf(stderr, "Warning!  Multiple DES-CBC-CRC keys "
-                        "for principal %s; skipping duplicates.\n",
+                fprintf(stderr, _("Warning!  Multiple DES-CBC-CRC keys for "
+                                  "principal %s; skipping duplicates.\n"),
                         princstr);
                 continue;
             }
@@ -1066,10 +1044,11 @@ static krb5_error_code dump_ov_princ(krb5_pointer ptr, krb5_db_entry *kdb)
             fputc('\t', arg->ofile);
             print_key_data(arg->ofile, key_data);
         }
-        if (!foundcrc)
-            fprintf(stderr, "Warning!  No DES-CBC-CRC key for principal "
-                    "%s, cannot generate OV-compatible record; skipping\n",
-                    princstr);
+        if (!foundcrc) {
+            fprintf(stderr, _("Warning!  No DES-CBC-CRC key for principal %s, "
+                              "cannot generate OV-compatible record; "
+                              "skipping\n"), princstr);
+        }
     }
 
     fputc('\n', arg->ofile);
@@ -1098,8 +1077,8 @@ dump_db(argc, argv)
     char                *new_mkey_file = 0;
     bool_t              dump_sno = FALSE;
     kdb_log_context     *log_ctx;
-    char                **db_args = 0; /* XXX */
     unsigned int        ipropx_version = IPROPX_VERSION_0;
+    krb5_keylist_node *mkeys;
 
     /*
      * Parse the arguments.
@@ -1180,7 +1159,7 @@ dump_db(argc, argv)
      * to be opened if we try a dump that uses it.
      */
     if (!dbactive) {
-        com_err(progname, 0, Err_no_database);
+        com_err(progname, 0, _("Database not currently opened!"));
         exit_status++;
         return;
     }
@@ -1199,19 +1178,17 @@ dump_db(argc, argv)
                                         NULL, NULL,
                                         &master_keyblock);
             if (retval) {
-                com_err(progname, retval,
-                        "while reading master key");
+                com_err(progname, retval, _("while reading master key"));
                 exit(1);
             }
-            retval = krb5_db_verify_master_key(util_context,
-                                               master_princ,
-                                               IGNORE_VNO,
-                                               &master_keyblock);
+            retval = krb5_db_fetch_mkey_list(util_context, master_princ,
+                                             &master_keyblock, IGNORE_VNO,
+                                             &mkeys);
             if (retval) {
-                com_err(progname, retval,
-                        "while verifying master key");
+                com_err(progname, retval, _("while verifying master key"));
                 exit(1);
             }
+            krb5_db_free_mkey_list(util_context, mkeys);
         }
         new_master_keyblock.enctype = global_params.enctype;
         if (new_master_keyblock.enctype == ENCTYPE_UNKNOWN)
@@ -1233,18 +1210,18 @@ dump_db(argc, argv)
                                              &kt_kvno,
                                              NULL,
                                              &new_master_keyblock))) {
-                com_err(progname, retval, "while reading new master key");
+                com_err(progname, retval, _("while reading new master key"));
                 exit(1);
             }
         } else {
-            printf("Please enter new master key....\n");
+            printf(_("Please enter new master key....\n"));
             if ((retval = krb5_db_fetch_mkey(util_context, master_princ,
                                              new_master_keyblock.enctype,
                                              TRUE,
                                              TRUE,
                                              NULL, NULL, NULL,
                                              &new_master_keyblock))) {
-                com_err(progname, retval, "while reading new master key");
+                com_err(progname, retval, _("while reading new master key"));
                 exit(1);
             }
         }
@@ -1252,7 +1229,7 @@ dump_db(argc, argv)
          * get new master key vno that will be used to protect princs, used
          * later on.
          */
-        new_mkvno = get_next_kvno(util_context, &master_entry);
+        new_mkvno = get_next_kvno(util_context, master_entry);
     }
 
     kret = 0;
@@ -1285,6 +1262,7 @@ dump_db(argc, argv)
                                    KRB5_LOCKMODE_EXCLUSIVE))) {
             fprintf(stderr, oflock_error,
                     progname, ofile, error_message(kret));
+            fclose(f);
             exit_status++;
         }
         else
@@ -1299,14 +1277,6 @@ dump_db(argc, argv)
         fprintf(arglist.ofile, "%s", dump->header);
 
         if (dump_sno) {
-            if (ulog_map(util_context, global_params.iprop_logfile,
-                         global_params.iprop_ulogsize, FKCOMMAND, db_args)) {
-                fprintf(stderr,
-                        _("%s: Could not map log\n"), progname);
-                exit_status++;
-                goto unlock_and_return;
-            }
-
             /*
              * We grab the lock twice (once again in the iterator call),
              * but that's ok since the lock func handles incr locks held.
@@ -1533,7 +1503,7 @@ process_k5beta_record(fname, kcontext, filep, flags, linenop)
 {
     int                 nmatched;
     int                 retval;
-    krb5_db_entry       dbent;
+    krb5_db_entry       *dbent;
     int                 name_len, mod_name_len, key_len;
     int                 alt_key_len, salt_len, alt_salt_len;
     char                *name;
@@ -1550,16 +1520,19 @@ process_k5beta_record(fname, kcontext, filep, flags, linenop)
     try2read = (char *) NULL;
     (*linenop)++;
     retval = 1;
-    memset(&dbent, 0, sizeof(dbent));
+    dbent = krb5_db_alloc(kcontext, NULL, sizeof(*dbent));
+    if (dbent == NULL)
+        return(1);
+    memset(dbent, 0, sizeof(*dbent));
 
     /* Make sure we've got key_data entries */
-    if (krb5_dbe_create_key_data(kcontext, &dbent) ||
-        krb5_dbe_create_key_data(kcontext, &dbent)) {
-        krb5_db_free_principal(kcontext, &dbent, 1);
+    if (krb5_dbe_create_key_data(kcontext, dbent) ||
+        krb5_dbe_create_key_data(kcontext, dbent)) {
+        krb5_db_free_principal(kcontext, dbent);
         return(1);
     }
-    pkey = &dbent.key_data[0];
-    akey = &dbent.key_data[1];
+    pkey = &dbent->key_data[0];
+    akey = &dbent->key_data[1];
 
     /*
      * Match the sizes.  6 tokens to match.
@@ -1634,17 +1607,17 @@ process_k5beta_record(fname, kcontext, filep, flags, linenop)
             /* Read principal attributes */
             if (!error && (fscanf(filep,
                                   "\t%u\t%u\t%u\t%u\t%u\t%u\t%u\t%u\t%u\t%u\t",
-                                  &tmpint1, &dbent.max_life,
-                                  &dbent.max_renewable_life,
-                                  &tmpint2, &dbent.expiration,
-                                  &dbent.pw_expiration, &last_pwd_change,
-                                  &dbent.last_success, &dbent.last_failed,
+                                  &tmpint1, &dbent->max_life,
+                                  &dbent->max_renewable_life,
+                                  &tmpint2, &dbent->expiration,
+                                  &dbent->pw_expiration, &last_pwd_change,
+                                  &dbent->last_success, &dbent->last_failed,
                                   &tmpint3) != 10)) {
                 try2read = read_pr_data1;
                 error++;
             }
             pkey->key_data_kvno = tmpint1;
-            dbent.fail_auth_count = tmpint3;
+            dbent->fail_auth_count = tmpint3;
             /* Read modifier name */
             if (!error && read_string(filep,
                                       mod_name,
@@ -1655,7 +1628,7 @@ process_k5beta_record(fname, kcontext, filep, flags, linenop)
             }
             /* Read second set of attributes */
             if (!error && (fscanf(filep, "\t%u\t%u\t%u\t",
-                                  &mod_date, &dbent.attributes,
+                                  &mod_date, &dbent->attributes,
                                   &tmpint1) != 3)) {
                 try2read = read_pr_data2;
                 error++;
@@ -1734,22 +1707,20 @@ process_k5beta_record(fname, kcontext, filep, flags, linenop)
             if (!error) {
                 if (!(kret = krb5_parse_name(kcontext,
                                              name,
-                                             &dbent.princ))) {
+                                             &dbent->princ))) {
                     if (!(kret = krb5_parse_name(kcontext,
                                                  mod_name,
                                                  &mod_princ))) {
                         if (!(kret =
                               krb5_dbe_update_mod_princ_data(kcontext,
-                                                             &dbent,
+                                                             dbent,
                                                              mod_date,
                                                              mod_princ)) &&
                             !(kret =
                               krb5_dbe_update_last_pwd_change(kcontext,
-                                                              &dbent,
+                                                              dbent,
                                                               last_pwd_change))) {
-                            int one = 1;
-
-                            dbent.len = KRB5_KDB_V1_BASE_LENGTH;
+                            dbent->len = KRB5_KDB_V1_BASE_LENGTH;
                             pkey->key_data_ver = (pkey->key_data_type[1] || pkey->key_data_length[1]) ?
                                 2 : 1;
                             akey->key_data_ver = (akey->key_data_type[1] || akey->key_data_length[1]) ?
@@ -1758,22 +1729,20 @@ process_k5beta_record(fname, kcontext, filep, flags, linenop)
                                  akey->key_data_type[0]) &&
                                 (pkey->key_data_type[1] ==
                                  akey->key_data_type[1]))
-                                dbent.n_key_data--;
+                                dbent->n_key_data--;
                             else if ((akey->key_data_type[0] == 0)
                                      && (akey->key_data_length[0] == 0)
                                      && (akey->key_data_type[1] == 0)
                                      && (akey->key_data_length[1] == 0))
-                                dbent.n_key_data--;
+                                dbent->n_key_data--;
 
-                            dbent.mask = KADM5_LOAD | KADM5_PRINCIPAL | KADM5_ATTRIBUTES |
+                            dbent->mask = KADM5_LOAD | KADM5_PRINCIPAL | KADM5_ATTRIBUTES |
                                 KADM5_MAX_LIFE | KADM5_MAX_RLIFE | KADM5_KEY_DATA |
                                 KADM5_PRINC_EXPIRE_TIME | KADM5_LAST_SUCCESS |
                                 KADM5_LAST_FAILED | KADM5_FAIL_AUTH_COUNT;
 
                             if ((kret = krb5_db_put_principal(kcontext,
-                                                              &dbent,
-                                                              &one)) ||
-                                (one != 1)) {
+                                                              dbent))) {
                                 fprintf(stderr, store_err_fmt,
                                         fname, *linenop, name,
                                         error_message(kret));
@@ -1784,7 +1753,7 @@ process_k5beta_record(fname, kcontext, filep, flags, linenop)
                                     fprintf(stderr, add_princ_fmt, name);
                                 retval = 0;
                             }
-                            dbent.n_key_data = 2;
+                            dbent->n_key_data = 2;
                         }
                         krb5_free_principal(kcontext, mod_princ);
                     }
@@ -1809,7 +1778,7 @@ process_k5beta_record(fname, kcontext, filep, flags, linenop)
             fprintf(stderr, no_mem_fmt, fname, *linenop);
         }
 
-        krb5_db_free_principal(kcontext, &dbent, 1);
+        krb5_db_free_principal(kcontext, dbent);
         if (mod_name)
             free(mod_name);
         if (name)
@@ -1838,11 +1807,11 @@ process_k5beta6_record(fname, kcontext, filep, flags, linenop)
     int                 *linenop;
 {
     int                 retval;
-    krb5_db_entry       dbentry;
+    krb5_db_entry       *dbentry;
     krb5_int32          t1, t2, t3, t4, t5, t6, t7, t8, t9;
     int                 nread;
     int                 error;
-    int                 i, j, one;
+    int                 i, j;
     char                *name;
     krb5_key_data       *kp, *kdatap;
     krb5_tl_data        **tlp, *tl;
@@ -1851,7 +1820,10 @@ process_k5beta6_record(fname, kcontext, filep, flags, linenop)
     const char          *try2read;
 
     try2read = (char *) NULL;
-    memset(&dbentry, 0, sizeof(dbentry));
+    dbentry = krb5_db_alloc(kcontext, NULL, sizeof(*dbentry));
+    if (dbentry == NULL)
+        return(1);
+    memset(dbentry, 0, sizeof(*dbentry));
     (*linenop)++;
     retval = 1;
     name = (char *) NULL;
@@ -1866,12 +1838,12 @@ process_k5beta6_record(fname, kcontext, filep, flags, linenop)
             error++;
 
         /* Get memory for and form tagged data linked list */
-        tlp = &dbentry.tl_data;
+        tlp = &dbentry->tl_data;
         for (i=0; i<t3; i++) {
             if ((*tlp = (krb5_tl_data *) malloc(sizeof(krb5_tl_data)))) {
                 memset(*tlp, 0, sizeof(krb5_tl_data));
                 tlp = &((*tlp)->tl_data_next);
-                dbentry.n_tl_data++;
+                dbentry->n_tl_data++;
             }
             else {
                 error++;
@@ -1889,37 +1861,37 @@ process_k5beta6_record(fname, kcontext, filep, flags, linenop)
             error++;
 
         if (!error) {
-            dbentry.len = t1;
-            dbentry.n_key_data = t4;
-            dbentry.e_length = t5;
+            dbentry->len = t1;
+            dbentry->n_key_data = t4;
+            dbentry->e_length = t5;
             if (kp) {
                 memset(kp, 0, (size_t) (t4*sizeof(krb5_key_data)));
-                dbentry.key_data = kp;
+                dbentry->key_data = kp;
                 kp = (krb5_key_data *) NULL;
             }
             if (op) {
                 memset(op, 0, (size_t) t5);
-                dbentry.e_data = op;
+                dbentry->e_data = op;
                 op = (krb5_octet *) NULL;
             }
 
             /* Read in and parse the principal name */
             if (!read_string(filep, name, t2, linenop) &&
-                !(kret = krb5_parse_name(kcontext, name, &dbentry.princ))) {
+                !(kret = krb5_parse_name(kcontext, name, &dbentry->princ))) {
 
                 /* Get the fixed principal attributes */
                 nread = fscanf(filep, "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t",
                                &t2, &t3, &t4, &t5, &t6, &t7, &t8, &t9);
                 if (nread == 8) {
-                    dbentry.attributes = (krb5_flags) t2;
-                    dbentry.max_life = (krb5_deltat) t3;
-                    dbentry.max_renewable_life = (krb5_deltat) t4;
-                    dbentry.expiration = (krb5_timestamp) t5;
-                    dbentry.pw_expiration = (krb5_timestamp) t6;
-                    dbentry.last_success = (krb5_timestamp) t7;
-                    dbentry.last_failed = (krb5_timestamp) t8;
-                    dbentry.fail_auth_count = (krb5_kvno) t9;
-                    dbentry.mask = KADM5_LOAD | KADM5_PRINCIPAL | KADM5_ATTRIBUTES |
+                    dbentry->attributes = (krb5_flags) t2;
+                    dbentry->max_life = (krb5_deltat) t3;
+                    dbentry->max_renewable_life = (krb5_deltat) t4;
+                    dbentry->expiration = (krb5_timestamp) t5;
+                    dbentry->pw_expiration = (krb5_timestamp) t6;
+                    dbentry->last_success = (krb5_timestamp) t7;
+                    dbentry->last_failed = (krb5_timestamp) t8;
+                    dbentry->fail_auth_count = (krb5_kvno) t9;
+                    dbentry->mask = KADM5_LOAD | KADM5_PRINCIPAL | KADM5_ATTRIBUTES |
                         KADM5_MAX_LIFE | KADM5_MAX_RLIFE |
                         KADM5_PRINC_EXPIRE_TIME | KADM5_LAST_SUCCESS |
                         KADM5_LAST_FAILED | KADM5_FAIL_AUTH_COUNT;
@@ -1938,8 +1910,8 @@ process_k5beta6_record(fname, kcontext, filep, flags, linenop)
                  * it at dump time has almost as good an effect, so
                  * that's what I did.  [krb5-admin/89]
                  */
-                if (!error && dbentry.n_tl_data) {
-                    for (tl = dbentry.tl_data; tl; tl = tl->tl_data_next) {
+                if (!error && dbentry->n_tl_data) {
+                    for (tl = dbentry->tl_data; tl; tl = tl->tl_data_next) {
                         nread = fscanf(filep, "%d\t%d\t", &t1, &t2);
                         if (nread == 2) {
                             tl->tl_data_type = (krb5_int16) t1;
@@ -1963,7 +1935,7 @@ process_k5beta6_record(fname, kcontext, filep, flags, linenop)
                                      * Assuming aux_attributes will always be
                                      * there
                                      */
-                                    dbentry.mask |= KADM5_AUX_ATTRIBUTES;
+                                    dbentry->mask |= KADM5_AUX_ATTRIBUTES;
 
                                     /* test for an actual policy reference */
                                     memset(&osa_princ_ent, 0, sizeof(osa_princ_ent));
@@ -1973,7 +1945,7 @@ process_k5beta6_record(fname, kcontext, filep, flags, linenop)
                                         (osa_princ_ent.aux_attributes & KADM5_POLICY) &&
                                         osa_princ_ent.policy != NULL) {
 
-                                        dbentry.mask |= KADM5_POLICY;
+                                        dbentry->mask |= KADM5_POLICY;
                                         kdb_free_entry(NULL, NULL, &osa_princ_ent);
                                     }
                                     xdr_destroy(&xdrs);
@@ -1996,13 +1968,13 @@ process_k5beta6_record(fname, kcontext, filep, flags, linenop)
                         }
                     }
                     if (!error)
-                        dbentry.mask |= KADM5_TL_DATA;
+                        dbentry->mask |= KADM5_TL_DATA;
                 }
 
                 /* Get the key data */
-                if (!error && dbentry.n_key_data) {
-                    for (i=0; !error && (i<dbentry.n_key_data); i++) {
-                        kdatap = &dbentry.key_data[i];
+                if (!error && dbentry->n_key_data) {
+                    for (i=0; !error && (i<dbentry->n_key_data); i++) {
+                        kdatap = &dbentry->key_data[i];
                         nread = fscanf(filep, "%d\t%d\t", &t1, &t2);
                         if (nread == 2) {
                             kdatap->key_data_ver = (krb5_int16) t1;
@@ -2044,14 +2016,14 @@ process_k5beta6_record(fname, kcontext, filep, flags, linenop)
                         }
                     }
                     if (!error)
-                        dbentry.mask |= KADM5_KEY_DATA;
+                        dbentry->mask |= KADM5_KEY_DATA;
                 }
 
                 /* Get the extra data */
-                if (!error && dbentry.e_length) {
+                if (!error && dbentry->e_length) {
                     if (read_octet_string(filep,
-                                          dbentry.e_data,
-                                          (int) dbentry.e_length)) {
+                                          dbentry->e_data,
+                                          (int) dbentry->e_length)) {
                         try2read = read_econtents;
                         error++;
                     }
@@ -2072,10 +2044,7 @@ process_k5beta6_record(fname, kcontext, filep, flags, linenop)
                  * We have either read in all the data or choked.
                  */
                 if (!error) {
-                    one = 1;
-                    if ((kret = krb5_db_put_principal(kcontext,
-                                                      &dbentry,
-                                                      &one))) {
+                    if ((kret = krb5_db_put_principal(kcontext, dbentry))) {
                         fprintf(stderr, store_err_fmt,
                                 fname, *linenop,
                                 name, error_message(kret));
@@ -2108,7 +2077,7 @@ process_k5beta6_record(fname, kcontext, filep, flags, linenop)
             free(kp);
         if (name)
             free(name);
-        krb5_db_free_principal(kcontext, &dbentry, 1);
+        krb5_db_free_principal(kcontext, dbentry);
     }
     else {
         if (nread == EOF)
@@ -2141,7 +2110,7 @@ process_k5beta7_policy(fname, kcontext, filep, flags, linenop)
     if (nread == EOF)
         return -1;
     else if (nread != 7) {
-        fprintf(stderr, "cannot parse policy on line %d (%d read)\n",
+        fprintf(stderr, _("cannot parse policy on line %d (%d read)\n"),
                 *linenop, nread);
         return 1;
     }
@@ -2149,13 +2118,13 @@ process_k5beta7_policy(fname, kcontext, filep, flags, linenop)
     if ((ret = krb5_db_create_policy(kcontext, &rec))) {
         if (ret &&
             ((ret = krb5_db_put_policy(kcontext, &rec)))) {
-            fprintf(stderr, "cannot create policy on line %d: %s\n",
+            fprintf(stderr, _("cannot create policy on line %d: %s\n"),
                     *linenop, error_message(ret));
             return 1;
         }
     }
     if (flags & FLAG_VERBOSE)
-        fprintf(stderr, "created policy %s\n", rec.name);
+        fprintf(stderr, _("created policy %s\n"), rec.name);
 
     return 0;
 }
@@ -2238,7 +2207,7 @@ process_k5beta7_record(fname, kcontext, filep, flags, linenop)
         process_k5beta7_policy(fname, kcontext, filep, flags,
                                linenop);
     else {
-        fprintf(stderr, "unknown record type \"%s\" on line %d\n",
+        fprintf(stderr, _("unknown record type \"%s\" on line %d\n"),
                 rectype, *linenop);
         return 1;
     }
@@ -2276,7 +2245,7 @@ process_ov_record(fname, kcontext, filep, flags, linenop)
     else if (strcmp(rectype, "End") == 0)
         return -1;
     else {
-        fprintf(stderr, "unknown record type \"%s\" on line %d\n",
+        fprintf(stderr, _("unknown record type \"%s\" on line %d\n"),
                 rectype, *linenop);
         return 1;
     }
@@ -2312,7 +2281,7 @@ process_r1_8_record(fname, kcontext, filep, flags, linenop)
         process_r1_8_policy(fname, kcontext, filep, flags,
                             linenop);
     else {
-        fprintf(stderr, "unknown record type \"%s\" on line %d\n",
+        fprintf(stderr, _("unknown record type \"%s\" on line %d\n"),
                 rectype, *linenop);
         return 1;
     }
@@ -2364,7 +2333,6 @@ load_db(argc, argv)
     int         argc;
     char        **argv;
 {
-    kadm5_config_params newparams;
     krb5_error_code     kret;
     krb5_context        kcontext;
     FILE                *f;
@@ -2372,7 +2340,6 @@ load_db(argc, argv)
     extern int          optind;
     char                *dumpfile;
     char                *dbname;
-    char                *dbname_tmp;
     char                buf[BUFSIZ];
     dump_version        *load;
     int                 flags;
@@ -2393,7 +2360,6 @@ load_db(argc, argv)
     flags = 0;
     crflags = KRB5_KDB_CREATE_BTREE;
     exit_status = 0;
-    dbname_tmp = (char *) NULL;
     log_ctx = util_context->kdblog_context;
 
     for (aindex = 1; aindex < argc; aindex++) {
@@ -2422,7 +2388,8 @@ load_db(argc, argv)
             flags |= FLAG_UPDATE;
         else if (!strcmp(argv[aindex], hashoption)) {
             if (!add_db_arg("hash=true")) {
-                com_err(progname, ENOMEM, "while parsing command arguments\n");
+                com_err(progname, ENOMEM,
+                        _("while parsing command arguments\n"));
                 exit(1);
             }
         } else
@@ -2434,26 +2401,18 @@ load_db(argc, argv)
     }
     dumpfile = argv[aindex];
 
-    if (asprintf(&dbname_tmp, "%s%s", dbname, dump_tmptrail) < 0) {
-        fprintf(stderr, no_name_mem_fmt, progname);
-        exit_status++;
-        return;
-    }
-
     /*
      * Initialize the Kerberos context and error tables.
      */
     if ((kret = kadm5_init_krb5_context(&kcontext))) {
         fprintf(stderr, ctx_err_fmt, progname);
-        free(dbname_tmp);
         exit_status++;
         return;
     }
 
     if( (kret = krb5_set_default_realm(kcontext, util_context->default_realm)) )
     {
-        fprintf(stderr, "%s: Unable to set the default realm\n", progname);
-        free(dbname_tmp);
+        fprintf(stderr, _("%s: Unable to set the default realm\n"), progname);
         exit_status++;
         return;
     }
@@ -2473,7 +2432,7 @@ load_db(argc, argv)
         }
         if ((kret = krb5_lock_file(kcontext, fileno(f),
                                    KRB5_LOCKMODE_SHARED))) {
-            fprintf(stderr, "%s: Cannot lock %s: %s\n", progname,
+            fprintf(stderr, _("%s: Cannot lock %s: %s\n"), progname,
                     dumpfile, error_message(errno));
             exit_status++;
             return;
@@ -2518,8 +2477,8 @@ load_db(argc, argv)
         }
     }
     if (load->updateonly && !(flags & FLAG_UPDATE)) {
-        fprintf(stderr, "%s: dump version %s can only be loaded with the "
-                "-update flag\n", progname, load->name);
+        fprintf(stderr, _("%s: dump version %s can only be loaded with the "
+                          "-update flag\n"), progname, load->name);
         exit_status++;
         return;
     }
@@ -2529,100 +2488,50 @@ load_db(argc, argv)
      * mode, we create an alternate database and then promote it to
      * be the live db.
      */
-    newparams = global_params;
     if (! (flags & FLAG_UPDATE)) {
-        newparams.mask |= KADM5_CONFIG_DBNAME;
-        newparams.dbname = dbname_tmp;
-
-        if ((kret = kadm5_get_config_params(kcontext, 1,
-                                            &newparams, &newparams))) {
-            com_err(progname, kret,
-                    "while retreiving new configuration parameters");
-            exit_status++;
-            return;
-        }
-
         if (!add_db_arg("temporary")) {
-            com_err(progname, ENOMEM, "computing parameters for database");
+            com_err(progname, ENOMEM, _("computing parameters for database"));
             exit(1);
         }
 
         if (!add_update && !add_db_arg("merge_nra")) {
-            com_err(progname, ENOMEM, "computing parameters for database");
+            com_err(progname, ENOMEM, _("computing parameters for database"));
             exit(1);
         }
-    }
 
-    /*
-     * If not an update restoration, create the database. otherwise open
-     */
-    if (!(flags & FLAG_UPDATE)) {
         if((kret = krb5_db_create(kcontext, db5util_db_args))) {
             const char *emsg = krb5_get_error_message(kcontext, kret);
-            /*
-             * See if something (like DAL KDB plugin) has set a specific error
-             * message and use that otherwise use default.
-             */
-
-            if (emsg != NULL) {
-                fprintf(stderr, "%s: %s\n", progname, emsg);
-                krb5_free_error_message (kcontext, emsg);
-            } else {
-                fprintf(stderr, dbcreaterr_fmt,
-                        progname, dbname, error_message(kret));
-            }
+            fprintf(stderr, "%s: %s\n", progname, emsg);
+            krb5_free_error_message (kcontext, emsg);
             exit_status++;
-            kadm5_free_config_params(kcontext, &newparams);
             if (dumpfile) fclose(f);
             return;
         }
     }
     else {
-        /*
-         * Initialize the database.
-         */
-        if ((kret = krb5_db_open(kcontext, db5util_db_args,
-                                 KRB5_KDB_OPEN_RW | KRB5_KDB_SRV_TYPE_ADMIN))) {
+        /* Initialize the database. */
+        kret = krb5_db_open(kcontext, db5util_db_args,
+                            KRB5_KDB_OPEN_RW | KRB5_KDB_SRV_TYPE_ADMIN);
+        if (kret) {
             const char *emsg = krb5_get_error_message(kcontext, kret);
-            /*
-             * See if something (like DAL KDB plugin) has set a specific
-             * error message and use that otherwise use default.
-             */
-
-            if (emsg != NULL) {
-                fprintf(stderr, "%s: %s\n", progname, emsg);
-                krb5_free_error_message (kcontext, emsg);
-            } else {
-                fprintf(stderr, dbinit_err_fmt,
-                        progname, error_message(kret));
-            }
+            fprintf(stderr, "%s: %s\n", progname, emsg);
+            krb5_free_error_message (kcontext, emsg);
             exit_status++;
             goto error;
         }
-    }
 
-
-    /*
-     * If an update restoration, make sure the db is left unusable if
-     * the update fails.
-     */
-    if ((kret = krb5_db_lock(kcontext,
-                             (flags & FLAG_UPDATE) ?
-                             KRB5_DB_LOCKMODE_PERMANENT :
-                             KRB5_DB_LOCKMODE_EXCLUSIVE))) {
-        /*
-         * Ignore a not supported error since there is nothing to do about it
-         * anyway.
-         */
-        if (kret != KRB5_PLUGIN_OP_NOTSUPP) {
-            fprintf(stderr, "%s: %s while permanently locking database\n",
+        /* Make sure the db is left unusable if the update fails, if the db
+         * supports locking. */
+        kret = krb5_db_lock(kcontext, KRB5_DB_LOCKMODE_PERMANENT);
+        if (kret == 0)
+            db_locked = 1;
+        else if (kret != KRB5_PLUGIN_OP_NOTSUPP) {
+            fprintf(stderr, _("%s: %s while permanently locking database\n"),
                     progname, error_message(kret));
             exit_status++;
             goto error;
         }
     }
-    else
-        db_locked = 1;
 
     if (log_ctx && log_ctx->iproprole) {
         if (add_update)
@@ -2700,7 +2609,7 @@ load_db(argc, argv)
     }
 
     if (!(flags & FLAG_UPDATE) && load->create_kadm5 &&
-        ((kret = kadm5_create_magic_princs(&newparams, kcontext)))) {
+        ((kret = kadm5_create_magic_princs(&global_params, kcontext)))) {
         /* error message printed by create_magic_princs */
         exit_status++;
     }
@@ -2729,8 +2638,8 @@ load_db(argc, argv)
          * anyway.
          */
         if (kret != 0 && kret != KRB5_PLUGIN_OP_NOTSUPP) {
-            fprintf(stderr, "%s: cannot make newly loaded database live (%s)\n",
-                    progname, error_message(kret));
+            fprintf(stderr, _("%s: cannot make newly loaded database live "
+                              "(%s)\n"), progname, error_message(kret));
             exit_status++;
         }
     }
@@ -2762,7 +2671,5 @@ error:
         fclose(f);
     }
 
-    if (dbname_tmp)
-        free(dbname_tmp);
     krb5_free_context(kcontext);
 }

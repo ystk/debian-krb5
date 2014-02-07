@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* plugins/kdb/ldap/libkdb_ldap/kdb_ldap.c */
 /*
- * lib/kdb/kdb_ldap/kdb_ldap.c
- *
  * Copyright (c) 2004-2005, Novell, Inc.
  * All rights reserved.
  *
@@ -40,8 +39,14 @@
 #include <kdb5.h>
 #include <kadm5/admin.h>
 
-#if defined(NEED_ISBLANK_PROTO) && !defined(isblank)
+#if !defined(isblank) && defined(HAVE_ISBLANK)
+#if defined(NEED_ISBLANK_PROTO)
 extern int isblank();
+#endif
+#else /* isblank missing */
+#if !defined(isblank)
+#define isblank isspace
+#endif
 #endif
 
 krb5_error_code
@@ -87,7 +92,7 @@ krb5_ldap_get_db_opt(char *input, char **opt, char **val)
  * ldap get age
  */
 krb5_error_code
-krb5_ldap_db_get_age(context, db_name, age)
+krb5_ldap_get_age(context, db_name, age)
     krb5_context context;
     char *db_name;
     time_t *age;
@@ -109,12 +114,13 @@ krb5_ldap_read_startup_information(krb5_context context)
 
     SETUP_CONTEXT();
     if ((retval=krb5_ldap_read_krbcontainer_params(context, &(ldap_context->krbcontainer)))) {
-        prepend_err_str (context, "Unable to read Kerberos container", retval, retval);
+        prepend_err_str(context, _("Unable to read Kerberos container"),
+                        retval, retval);
         goto cleanup;
     }
 
     if ((retval=krb5_ldap_read_realm_params(context, context->default_realm, &(ldap_context->lrparams), &mask))) {
-        prepend_err_str (context, "Unable to read Realm", retval, retval);
+        prepend_err_str(context, _("Unable to read Realm"), retval, retval);
         goto cleanup;
     }
 
@@ -240,8 +246,8 @@ cleanup:
     return ret;
 }
 
-#define ERR_MSG1 "Unable to check if SASL EXTERNAL mechanism is supported by LDAP server. Proceeding anyway ..."
-#define ERR_MSG2 "SASL EXTERNAL mechanism not supported by LDAP server. Can't perform certificate-based bind."
+#define ERR_MSG1 _("Unable to check if SASL EXTERNAL mechanism is supported by LDAP server. Proceeding anyway ...")
+#define ERR_MSG2 _("SASL EXTERNAL mechanism not supported by LDAP server. Can't perform certificate-based bind.")
 
 /* Function to check if a LDAP server supports the SASL external mechanism
  *Return values:
@@ -323,12 +329,13 @@ krb5_ldap_open(krb5_context context, char *conf_section, char **db_args,
                 free (opt);
                 free (val);
                 status = EINVAL;
-                krb5_set_error_message (context, status, "'binddn' missing");
+                krb5_set_error_message(context, status, _("'binddn' missing"));
                 goto clean_n_exit;
             }
             if (val == NULL) {
                 status = EINVAL;
-                krb5_set_error_message (context, status, "'binddn' value missing");
+                krb5_set_error_message(context, status,
+                                       _("'binddn' value missing"));
                 free(opt);
                 goto clean_n_exit;
             }
@@ -344,12 +351,13 @@ krb5_ldap_open(krb5_context context, char *conf_section, char **db_args,
                 free (opt);
                 free (val);
                 status = EINVAL;
-                krb5_set_error_message (context, status, "'nconns' missing");
+                krb5_set_error_message(context, status, _("'nconns' missing"));
                 goto clean_n_exit;
             }
             if (val == NULL) {
                 status = EINVAL;
-                krb5_set_error_message (context, status, "'nconns' value missing");
+                krb5_set_error_message(context, status,
+                                       _("'nconns' value missing"));
                 free(opt);
                 goto clean_n_exit;
             }
@@ -359,12 +367,14 @@ krb5_ldap_open(krb5_context context, char *conf_section, char **db_args,
                 free (opt);
                 free (val);
                 status = EINVAL;
-                krb5_set_error_message (context, status, "'bindpwd' missing");
+                krb5_set_error_message(context, status,
+                                       _("'bindpwd' missing"));
                 goto clean_n_exit;
             }
             if (val == NULL) {
                 status = EINVAL;
-                krb5_set_error_message (context, status, "'bindpwd' value missing");
+                krb5_set_error_message(context, status,
+                                       _("'bindpwd' value missing"));
                 free(opt);
                 goto clean_n_exit;
             }
@@ -378,7 +388,8 @@ krb5_ldap_open(krb5_context context, char *conf_section, char **db_args,
         } else if (opt && !strcmp(opt, "host")) {
             if (val == NULL) {
                 status = EINVAL;
-                krb5_set_error_message (context, status, "'host' value missing");
+                krb5_set_error_message(context, status,
+                                       _("'host' value missing"));
                 free(opt);
                 goto clean_n_exit;
             }
@@ -415,7 +426,8 @@ krb5_ldap_open(krb5_context context, char *conf_section, char **db_args,
         } else if (opt && !strcmp(opt, "cert")) {
             if (val == NULL) {
                 status = EINVAL;
-                krb5_set_error_message (context, status, "'cert' value missing");
+                krb5_set_error_message(context, status,
+                                       _("'cert' value missing"));
                 free(opt);
                 goto clean_n_exit;
             }
@@ -450,10 +462,12 @@ krb5_ldap_open(krb5_context context, char *conf_section, char **db_args,
                  * temporary is passed in when kdb5_util load without -update is done.
                  * This is unsupported by the LDAP plugin.
                  */
-                krb5_set_error_message (context, status,
-                                        "open of LDAP directory aborted, plugin requires -update argument");
+                krb5_set_error_message(context, status,
+                                       _("open of LDAP directory aborted, "
+                                         "plugin requires -update argument"));
             } else {
-                krb5_set_error_message (context, status, "unknown option \'%s\'",
+                krb5_set_error_message (context, status,
+                                        _("unknown option \'%s\'"),
                                         opt?opt:val);
             }
             free(opt);
@@ -474,7 +488,8 @@ krb5_ldap_open(krb5_context context, char *conf_section, char **db_args,
             krb5_ldap_free_ldap_context(ldap_context);
         ldap_context = NULL;
         dal_handle->db_context = NULL;
-        prepend_err_str (context, "Error reading LDAP server params: ", status, status);
+        prepend_err_str(context, _("Error reading LDAP server params: "),
+                        status, status);
         goto clean_n_exit;
     }
     if ((status=krb5_ldap_db_init(context, ldap_context)) != 0) {
@@ -526,4 +541,57 @@ int
 kldap_ensure_initialized(void)
 {
     return CALL_INIT_FUNCTION (kldap_init_fn);
+}
+
+krb5_error_code
+krb5_ldap_check_policy_as(krb5_context kcontext, krb5_kdc_req *request,
+                          krb5_db_entry *client, krb5_db_entry *server,
+                          krb5_timestamp kdc_time, const char **status,
+                          krb5_pa_data ***e_data)
+{
+    krb5_error_code retval;
+
+    retval = krb5_ldap_lockout_check_policy(kcontext, client, kdc_time);
+    if (retval == KRB5KDC_ERR_CLIENT_REVOKED)
+        *status = "LOCKED_OUT";
+    return retval;
+}
+
+void
+krb5_ldap_audit_as_req(krb5_context kcontext, krb5_kdc_req *request,
+                       krb5_db_entry *client, krb5_db_entry *server,
+                       krb5_timestamp authtime, krb5_error_code error_code)
+{
+    (void) krb5_ldap_lockout_audit(kcontext, client, authtime, error_code);
+}
+
+krb5_error_code
+krb5_ldap_check_allowed_to_delegate(krb5_context context,
+                                    krb5_const_principal client,
+                                    const krb5_db_entry *server,
+                                    krb5_const_principal proxy)
+{
+    krb5_error_code code;
+    krb5_tl_data *tlp;
+
+    code = KRB5KDC_ERR_POLICY;
+
+    for (tlp = server->tl_data; tlp != NULL; tlp = tlp->tl_data_next) {
+        krb5_principal acl;
+
+        if (tlp->tl_data_type != KRB5_TL_CONSTRAINED_DELEGATION_ACL)
+            continue;
+
+        if (krb5_parse_name(context, (char *)tlp->tl_data_contents, &acl) != 0)
+            continue;
+
+        if (krb5_principal_compare(context, proxy, acl)) {
+            code = 0;
+            krb5_free_principal(context, acl);
+            break;
+        }
+        krb5_free_principal(context, acl);
+    }
+
+    return code;
 }

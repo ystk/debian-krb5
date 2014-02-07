@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/asn.1/asn1_k_decode.h */
 /*
- * src/lib/krb5/asn.1/asn1_k_decode.h
- *
  * Copyright 1994 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -270,5 +269,18 @@ asn1_error_code asn1_decode_ad_kdcissued_ptr(asn1buf *buf,
 
 asn1_error_code asn1_decode_ad_signedpath(asn1buf *buf,
                                           krb5_ad_signedpath *val);
+
+asn1_error_code asn1_decode_iakerb_header(asn1buf *buf,
+                                          krb5_iakerb_header *val);
+
+asn1_error_code asn1_decode_iakerb_finished(asn1buf *buf,
+                                            krb5_iakerb_finished *val);
+
+asn1_error_code
+asn1_decode_kdf_alg_id(asn1buf *buf, krb5_octet_data *val);
+
+asn1_error_code
+asn1_decode_sequence_of_kdf_alg_id(asn1buf *buf,
+                                   krb5_octet_data ***val);
 
 #endif

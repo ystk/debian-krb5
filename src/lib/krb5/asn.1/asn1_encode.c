@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/asn.1/asn1_encode.c */
 /*
- * src/lib/krb5/asn.1/asn1_encode.c
- *
  * Copyright 1994, 2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -177,7 +176,7 @@ encode_bytestring_with_tag(asn1buf *buf, unsigned int len,
 }
 
 asn1_error_code
-asn1_encode_oid(asn1buf *buf, unsigned int len, const asn1_octet *val,
+asn1_encode_oid(asn1buf *buf, unsigned int len, const void *val,
                 unsigned int *retlen)
 {
     return encode_bytestring_with_tag(buf, len, val, ASN1_OBJECTIDENTIFIER,
@@ -409,7 +408,7 @@ krb5int_asn1_encode_a_thing(asn1buf *buf, const void *val,
         retval = krb5int_asn1_encode_a_thing(buf, val, a->basetype, &length);
         if (retval) return retval;
         sum = length;
-        retval = asn1_make_etag(buf, a->tagtype, a->tagval, sum, &length);
+        retval = asn1_make_tag(buf, a->tagtype, a->construction, a->tagval, sum, &length);
         if (retval) return retval;
         sum += length;
         *retlen = sum;

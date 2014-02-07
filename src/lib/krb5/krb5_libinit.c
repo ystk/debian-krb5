@@ -35,10 +35,13 @@ int krb5int_lib_init(void)
 #endif
 
     add_error_table(&et_krb5_error_table);
+    add_error_table(&et_k5e1_error_table);
     add_error_table(&et_kv5m_error_table);
     add_error_table(&et_kdb5_error_table);
     add_error_table(&et_asn1_error_table);
     add_error_table(&et_k524_error_table);
+
+    bindtextdomain(KRB5_TEXTDOMAIN, LOCALEDIR);
 
     err = krb5int_rc_finish_init();
     if (err)
@@ -94,6 +97,7 @@ void krb5int_lib_fini(void)
 #endif
 
     remove_error_table(&et_krb5_error_table);
+    remove_error_table(&et_k5e1_error_table);
     remove_error_table(&et_kv5m_error_table);
     remove_error_table(&et_kdb5_error_table);
     remove_error_table(&et_asn1_error_table);

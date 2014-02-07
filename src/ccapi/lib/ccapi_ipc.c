@@ -1,6 +1,5 @@
+/* ccapi/lib/ccapi_ipc.c */
 /*
- * $Header$
- *
  * Copyright 2006 Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -29,16 +28,16 @@
 
 /* ------------------------------------------------------------------------ */
 
-cc_int32 cci_ipc_thread_init (void)
+cc_int32 cci_ipc_process_init (void)
 {
-    return cci_os_ipc_thread_init ();
+    return cci_os_ipc_process_init ();
 }
 
 /* ------------------------------------------------------------------------ */
 
-void cci_ipc_thread_fini (void)
+cc_int32 cci_ipc_thread_init (void)
 {
-    cci_os_ipc_thread_fini ();
+    return cci_os_ipc_thread_init ();
 }
 
 /* ------------------------------------------------------------------------ */

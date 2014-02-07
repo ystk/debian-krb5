@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/krb/rd_rep.c */
 /*
- * lib/krb5/krb/rd_rep.c
- *
  * Copyright 1990,1991 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,9 +22,6 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
- * krb5_rd_rep()
  */
 /*
  * Copyright (c) 2006-2008, Novell, Inc.
@@ -133,6 +129,9 @@ krb5_rd_rep(krb5_context context, krb5_auth_context auth_context,
     /* Get remote sequence number. */
     auth_context->remote_seq_number = enc->seq_number;
 
+    TRACE_RD_REP(context, enc->ctime, enc->cusec, enc->subkey,
+                 enc->seq_number);
+
     *repl = enc;
     enc = NULL;
 
@@ -191,6 +190,8 @@ krb5_rd_rep_dce(krb5_context context, krb5_auth_context auth_context,
         retval = KRB5_MUTUAL_FAILED;
         goto clean_scratch;
     }
+
+    TRACE_RD_REP_DCE(context, repl->ctime, repl->cusec, repl->seq_number);
 
 clean_scratch:
     memset(scratch.data, 0, scratch.length);

@@ -1,4 +1,29 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* tests/asn.1/ktest.c */
+/*
+ * Copyright (C) 1994 by the Massachusetts Institute of Technology.
+ * All rights reserved.
+ *
+ * Export of this software from the United States of America may
+ *   require a specific license from the United States Government.
+ *   It is the responsibility of any person or organization contemplating
+ *   export to obtain such a license before exporting.
+ *
+ * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
+ * distribute this software and its documentation for any purpose and
+ * without fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright notice and
+ * this permission notice appear in supporting documentation, and that
+ * the name of M.I.T. not be used in advertising or publicity pertaining
+ * to distribution of the software without specific, written prior
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is" without express
+ * or implied warranty.
+ */
+
 #include "ktest.h"
 #include "utility.h"
 #include <stdlib.h>
@@ -868,8 +893,6 @@ krb5_error_code ktest_make_sample_ad_signedpath_data(p)
     retval = ktest_make_sample_principal(&p->delegated[0]);
     if (retval) return retval;
     p->delegated[1] = NULL;
-    retval = ktest_make_sample_principal(&p->client);
-    if (retval) return retval;
     retval = ktest_make_sample_authorization_data(&p->authorization_data);
     if (retval) return retval;
     retval = ktest_make_sample_pa_data_array(&p->method_data);
@@ -888,6 +911,28 @@ krb5_error_code ktest_make_sample_ad_signedpath(p)
     if (retval) return retval;
     p->delegated[1] = NULL;
     retval = ktest_make_sample_pa_data_array(&p->method_data);
+    if (retval) return retval;
+    return retval;
+}
+
+krb5_error_code ktest_make_sample_iakerb_header(ih)
+    krb5_iakerb_header *ih;
+{
+    krb5_error_code retval;
+    retval = ktest_make_sample_data(&(ih->target_realm));
+    if (retval) return retval;
+    ih->cookie = k5alloc(sizeof(krb5_data), &retval);
+    if (retval) return retval;
+    retval = ktest_make_sample_data(ih->cookie);
+    if (retval) return retval;
+    return retval;
+}
+
+krb5_error_code ktest_make_sample_iakerb_finished(ih)
+    krb5_iakerb_finished *ih;
+{
+    krb5_error_code retval;
+    retval = ktest_make_sample_checksum(&ih->checksum);
     if (retval) return retval;
     return retval;
 }
@@ -1532,6 +1577,19 @@ void ktest_empty_ad_signedpath(p)
         free(p->delegated);
     }
     ktest_destroy_pa_data_array(&p->method_data);
+}
+
+void ktest_empty_iakerb_header(p)
+    krb5_iakerb_header *p;
+{
+    krb5_free_data_contents(NULL, &p->target_realm);
+    krb5_free_data(NULL, p->cookie);
+}
+
+void ktest_empty_iakerb_finished(p)
+    krb5_iakerb_finished *p;
+{
+    krb5_free_checksum_contents(NULL, &p->checksum);
 }
 
 #ifdef ENABLE_LDAP

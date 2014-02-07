@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/krb/kfree.c */
 /*
- * lib/krb5/free/f_addr.c
- *
  * Copyright 1990-1998, 2009 by the Massachusetts Institute of Technology.
  *
  * Export of this software from the United States of America may
@@ -22,9 +21,6 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
- * krb5_free_address()
  */
 /*
  * Copyright (c) 2006-2008, Novell, Inc.
@@ -134,20 +130,6 @@ krb5_free_authenticator_contents(krb5_context context, krb5_authenticator *val)
 }
 
 void KRB5_CALLCONV
-krb5_free_authdata(krb5_context context, krb5_authdata **val)
-{
-    register krb5_authdata **temp;
-
-    if (val == NULL)
-        return;
-    for (temp = val; *temp; temp++) {
-        free((*temp)->contents);
-        free(*temp);
-    }
-    free(val);
-}
-
-void KRB5_CALLCONV
 krb5_free_authenticator(krb5_context context, krb5_authenticator *val)
 {
     if (val == NULL)
@@ -254,6 +236,16 @@ krb5_free_data(krb5_context context, krb5_data *val)
     free(val);
 }
 
+
+void KRB5_CALLCONV
+krb5_free_octet_data(krb5_context context, krb5_octet_data *val)
+{
+    if (val == NULL)
+        return;
+    free(val->data);
+    free(val);
+}
+
 void KRB5_CALLCONV
 krb5_free_data_contents(krb5_context context, krb5_data *val)
 {
@@ -347,7 +339,6 @@ krb5_free_kdc_req(krb5_context context, krb5_kdc_req *val)
 {
     if (val == NULL)
         return;
-    assert( val->kdc_state == NULL);
     krb5_free_pa_data(context, val->padata);
     krb5_free_principal(context, val->client);
     krb5_free_principal(context, val->server);
@@ -537,6 +528,12 @@ krb5_free_unparsed_name(krb5_context context, char *val)
 {
     if (val != NULL)
         free(val);
+}
+
+void KRB5_CALLCONV
+krb5_free_string(krb5_context context, char *val)
+{
+    free(val);
 }
 
 void KRB5_CALLCONV
@@ -822,7 +819,8 @@ krb5_free_etype_list(krb5_context context,
         free(etypes);
     }
 }
-void krb5_free_fast_req(krb5_context context, krb5_fast_req *val)
+void KRB5_CALLCONV
+krb5_free_fast_req(krb5_context context, krb5_fast_req *val)
 {
     if (val == NULL)
         return;
@@ -830,7 +828,8 @@ void krb5_free_fast_req(krb5_context context, krb5_fast_req *val)
     free(val);
 }
 
-void krb5_free_fast_armor(krb5_context context, krb5_fast_armor *val)
+void KRB5_CALLCONV
+krb5_free_fast_armor(krb5_context context, krb5_fast_armor *val)
 {
     if (val == NULL)
         return;
@@ -838,7 +837,8 @@ void krb5_free_fast_armor(krb5_context context, krb5_fast_armor *val)
     free(val);
 }
 
-void krb5_free_fast_response(krb5_context context, krb5_fast_response *val)
+void KRB5_CALLCONV
+krb5_free_fast_response(krb5_context context, krb5_fast_response *val)
 {
     if (!val)
         return;
@@ -848,8 +848,8 @@ void krb5_free_fast_response(krb5_context context, krb5_fast_response *val)
     free(val);
 }
 
-void krb5_free_fast_finished
-(krb5_context context, krb5_fast_finished *val)
+void KRB5_CALLCONV
+krb5_free_fast_finished(krb5_context context, krb5_fast_finished *val)
 {
     if (!val)
         return;
@@ -858,7 +858,8 @@ void krb5_free_fast_finished
     free(val);
 }
 
-void krb5_free_typed_data(krb5_context context, krb5_typed_data **in)
+void
+krb5_free_typed_data(krb5_context context, krb5_typed_data **in)
 {
     int i = 0;
     if (in == NULL) return;
@@ -871,8 +872,8 @@ void krb5_free_typed_data(krb5_context context, krb5_typed_data **in)
     free(in);
 }
 
-void krb5_free_fast_armored_req(krb5_context context,
-                                krb5_fast_armored_req *val)
+void KRB5_CALLCONV
+krb5_free_fast_armored_req(krb5_context context, krb5_fast_armored_req *val)
 {
     if (val == NULL)
         return;
@@ -925,5 +926,26 @@ krb5_free_ad_signedpath(krb5_context context, krb5_ad_signedpath *val)
         free(val->delegated);
     }
     krb5_free_pa_data(context, val->method_data);
+    free(val);
+}
+
+void KRB5_CALLCONV
+krb5_free_iakerb_header(krb5_context context, krb5_iakerb_header *val)
+{
+    if (val == NULL)
+        return ;
+
+    krb5_free_data_contents(context, &val->target_realm);
+    krb5_free_data(context, val->cookie);
+    free(val);
+}
+
+void KRB5_CALLCONV
+krb5_free_iakerb_finished(krb5_context context, krb5_iakerb_finished *val)
+{
+    if (val == NULL)
+        return ;
+
+    krb5_free_checksum_contents(context, &val->checksum);
     free(val);
 }

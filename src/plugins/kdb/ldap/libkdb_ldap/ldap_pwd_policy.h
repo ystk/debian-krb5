@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* plugins/kdb/ldap/libkdb_ldap/ldap_pwd_policy.h */
 /*
- * lib/kdb/kdb_ldap/ldap_pwd_policy.h
- *
  * Copyright (c) 2004-2005, Novell, Inc.
  * All rights reserved.
  *
@@ -33,7 +32,7 @@
 #define _LDAP_KRBPWDPOLICY_H_
 
 krb5_error_code
-krb5_ldap_get_password_policy(krb5_context, char *, osa_policy_ent_t *, int *);
+krb5_ldap_get_password_policy(krb5_context, char *, osa_policy_ent_t *);
 
 krb5_error_code
 krb5_ldap_create_password_policy(krb5_context, osa_policy_ent_t);

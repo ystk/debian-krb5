@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* plugins/kdb/ldap/ldap_util/kdb5_ldap_realm.c */
 /*
- * kadmin/ldap_util/kdb5_ldap_realm.c
- *
  * Copyright 1990,1991,2001, 2002, 2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -82,9 +81,6 @@
  * Create / Modify / Destroy / View / List realm(s)
  */
 
-/* Needed for getting the definition of KRB5_TL_DB_ARGS */
-#define SECURID
-
 #include <stdio.h>
 #include <k5-int.h>
 #include <kadm5/admin.h>
@@ -130,7 +126,9 @@ extern kadm5_config_params global_params;
 
 static void print_realm_params(krb5_ldap_realm_params *rparams, int mask);
 static int kdb_ldap_create_principal (krb5_context context, krb5_principal
-                                      princ, enum ap_op op, struct realm_info *pblock);
+                                      princ, enum ap_op op,
+                                      struct realm_info *pblock,
+                                      const krb5_keyblock *master_keyblock);
 
 
 static char *strdur(time_t duration);
@@ -169,7 +167,7 @@ get_ticket_policy(krb5_ldap_realm_params *rparams, int *i, char *argv[],
         date = get_date(argv[*i]);
         if (date == (time_t)(-1)) {
             retval = EINVAL;
-            com_err (me, retval, "while providing time specification");
+            com_err(me, retval, _("while providing time specification"));
             goto err_nomsg;
         }
         rparams->max_life = date-now;
@@ -184,7 +182,7 @@ get_ticket_policy(krb5_ldap_realm_params *rparams, int *i, char *argv[],
         date = get_date(argv[*i]);
         if (date == (time_t)(-1)) {
             retval = EINVAL;
-            com_err (me, retval, "while providing time specification");
+            com_err(me, retval, _("while providing time specification"));
             goto err_nomsg;
         }
         rparams->max_renewable_life = date-now;
@@ -372,7 +370,7 @@ kdb5_ldap_create(int argc, char *argv[])
             } else if (strncmp(argv[i], "", strlen(argv[i]))==0) {
                 /* dont allow subtree value to be set at the root(NULL, "") of the tree */
                 com_err(progname, EINVAL,
-                        "for subtree while creating realm '%s'",
+                        _("for subtree while creating realm '%s'"),
                         global_params.realm);
                 goto err_nomsg;
             }
@@ -384,7 +382,7 @@ kdb5_ldap_create(int argc, char *argv[])
             if (strncmp(argv[i], "", strlen(argv[i]))==0) {
                 /* dont allow containerref value to be set at the root(NULL, "") of the tree */
                 com_err(progname, EINVAL,
-                        "for container reference while creating realm '%s'",
+                        _("for container reference while creating realm '%s'"),
                         global_params.realm);
                 goto err_nomsg;
             }
@@ -408,8 +406,8 @@ kdb5_ldap_create(int argc, char *argv[])
                 rparams->search_scope = atoi(argv[i]);
                 if ((rparams->search_scope != 1) &&
                     (rparams->search_scope != 2)) {
-                    com_err(progname, EINVAL,
-                            "invalid search scope while creating realm '%s'",
+                    com_err(progname, EINVAL, _("invalid search scope while "
+                                                "creating realm '%s'"),
                             global_params.realm);
                     goto err_nomsg;
                 }
@@ -471,7 +469,7 @@ kdb5_ldap_create(int argc, char *argv[])
         }
 
         else {
-            printf("'%s' is an invalid option\n", argv[i]);
+            printf(_("'%s' is an invalid option\n"), argv[i]);
             goto err_usage;
         }
     }
@@ -491,12 +489,12 @@ kdb5_ldap_create(int argc, char *argv[])
     krb5_princ_set_realm_data(util_context, &db_create_princ, global_params.realm);
     krb5_princ_set_realm_length(util_context, &db_create_princ, strlen(global_params.realm));
 
-    printf("Initializing database for realm '%s'\n", global_params.realm);
+    printf(_("Initializing database for realm '%s'\n"), global_params.realm);
 
     if (!mkey_password) {
         unsigned int pw_size;
-        printf("You will be prompted for the database Master Password.\n");
-        printf("It is important that you NOT FORGET this password.\n");
+        printf(_("You will be prompted for the database Master Password.\n"));
+        printf(_("It is important that you NOT FORGET this password.\n"));
         fflush(stdout);
 
         pw_size = sizeof (pw_str);
@@ -505,25 +503,17 @@ kdb5_ldap_create(int argc, char *argv[])
         retval = krb5_read_password(util_context, KRB5_KDC_MKEY_1, KRB5_KDC_MKEY_2,
                                     pw_str, &pw_size);
         if (retval) {
-            com_err(progname, retval, "while reading master key from keyboard");
+            com_err(progname, retval,
+                    _("while reading master key from keyboard"));
             goto err_nomsg;
         }
         mkey_password = pw_str;
     }
 
-    rparams->mkey.enctype = global_params.enctype;
-    /* We are sure that 'mkey_password' is a regular string ... */
-    rparams->mkey.length = strlen(mkey_password) + 1;
-    rparams->mkey.contents = (krb5_octet *)strdup(mkey_password);
-    if (rparams->mkey.contents == NULL) {
-        retval = ENOMEM;
-        goto cleanup;
-    }
-
     rparams->realm_name = strdup(global_params.realm);
     if (rparams->realm_name == NULL) {
         retval = ENOMEM;
-        com_err(progname, ENOMEM, "while creating realm '%s'",
+        com_err(progname, ENOMEM, _("while creating realm '%s'"),
                 global_params.realm);
         goto err_nomsg;
     }
@@ -548,7 +538,7 @@ kdb5_ldap_create(int argc, char *argv[])
         if (ldap_context->conf_section) {
             if ((retval=profile_get_string(util_context->profile,
                                            KDB_MODULE_SECTION, ldap_context->conf_section,
-                                           "ldap_kerberos_container_dn", NULL,
+                                           KRB5_CONF_LDAP_KERBEROS_CONTAINER_DN, NULL,
                                            &kparams.DN)) != 0) {
                 goto cleanup;
             }
@@ -556,18 +546,18 @@ kdb5_ldap_create(int argc, char *argv[])
         if (kparams.DN == NULL) {
             if ((retval=profile_get_string(util_context->profile,
                                            KDB_MODULE_DEF_SECTION,
-                                           "ldap_kerberos_container_dn", NULL,
+                                           KRB5_CONF_LDAP_KERBEROS_CONTAINER_DN, NULL,
                                            NULL, &kparams.DN)) != 0) {
                 goto cleanup;
             }
         }
 
-        printf("\nKerberos container is missing. Creating now...\n");
+        printf(_("\nKerberos container is missing. Creating now...\n"));
         if (kparams.DN == NULL) {
 #ifdef HAVE_EDIRECTORY
             printf("Enter DN of Kerberos container [cn=Kerberos,cn=Security]: ");
 #else
-            printf("Enter DN of Kerberos container: ");
+            printf(_("Enter DN of Kerberos container: "));
 #endif
             if (fgets(krb_location, MAX_KRB_CONTAINER_LEN, stdin) != NULL) {
                 /* Remove the newline character at the end */
@@ -595,11 +585,13 @@ kdb5_ldap_create(int argc, char *argv[])
         retval = krb5_ldap_read_krbcontainer_params(util_context,
                                                     &(ldap_context->krbcontainer));
         if (retval) {
-            com_err(progname, retval, "while reading kerberos container information");
+            com_err(progname, retval,
+                    _("while reading kerberos container information"));
             goto cleanup;
         }
     } else if (retval) {
-        com_err(progname, retval, "while reading kerberos container information");
+        com_err(progname, retval,
+                _("while reading kerberos container information"));
         goto cleanup;
     }
 
@@ -615,7 +607,7 @@ kdb5_ldap_create(int argc, char *argv[])
                                               global_params.realm,
                                               &(ldap_context->lrparams),
                                               &mask))) {
-        com_err(progname, retval, "while reading information of realm '%s'",
+        com_err(progname, retval, _("while reading information of realm '%s'"),
                 global_params.realm);
         goto err_nomsg;
     }
@@ -630,7 +622,7 @@ kdb5_ldap_create(int argc, char *argv[])
                                           global_params.mkey_name,
                                           global_params.realm,
                                           0, &master_princ))) {
-        com_err(progname, retval, "while setting up master key name");
+        com_err(progname, retval, _("while setting up master key name"));
         goto err_nomsg;
     }
 
@@ -642,33 +634,24 @@ kdb5_ldap_create(int argc, char *argv[])
         pwd.length = strlen(mkey_password);
         retval = krb5_principal2salt(util_context, master_princ, &master_salt);
         if (retval) {
-            com_err(progname, retval, "while calculating master key salt");
+            com_err(progname, retval, _("while calculating master key salt"));
             goto err_nomsg;
         }
 
-        retval = krb5_c_string_to_key(util_context, rparams->mkey.enctype,
+        retval = krb5_c_string_to_key(util_context, global_params.enctype,
                                       &pwd, &master_salt, &master_keyblock);
 
         if (master_salt.data)
             free(master_salt.data);
 
         if (retval) {
-            com_err(progname, retval, "while transforming master key from password");
+            com_err(progname, retval,
+                    _("while transforming master key from password"));
             goto err_nomsg;
         }
 
+        rblock.key = &master_keyblock;
     }
-
-    rblock.key = &master_keyblock;
-    ldap_context->lrparams->mkey = master_keyblock;
-    ldap_context->lrparams->mkey.contents = (krb5_octet *) malloc
-        (master_keyblock.length);
-    if (ldap_context->lrparams->mkey.contents == NULL) {
-        retval = ENOMEM;
-        goto cleanup;
-    }
-    memcpy (ldap_context->lrparams->mkey.contents, master_keyblock.contents,
-            master_keyblock.length);
 
     /* Create special principals inside the realm subtree */
     {
@@ -695,29 +678,38 @@ kdb5_ldap_create(int argc, char *argv[])
 
         /* Create 'K/M' ... */
         rblock.flags |= KRB5_KDB_DISALLOW_ALL_TIX;
-        if ((retval = kdb_ldap_create_principal(util_context, master_princ, MASTER_KEY, &rblock))) {
-            com_err(progname, retval, "while adding entries to the database");
+        if ((retval = kdb_ldap_create_principal(util_context, master_princ,
+                                                MASTER_KEY, &rblock,
+                                                &master_keyblock))) {
+            com_err(progname, retval,
+                    _("while adding entries to the database"));
             goto err_nomsg;
         }
 
         /* Create 'krbtgt' ... */
         rblock.flags = 0; /* reset the flags */
-        if ((retval = kdb_ldap_create_principal(util_context, &tgt_princ, TGT_KEY, &rblock))) {
-            com_err(progname, retval, "while adding entries to the database");
+        if ((retval = kdb_ldap_create_principal(util_context, &tgt_princ,
+                                                TGT_KEY, &rblock,
+                                                &master_keyblock))) {
+            com_err(progname, retval,
+                    _("while adding entries to the database"));
             goto err_nomsg;
         }
 
         /* Create 'kadmin/admin' ... */
         snprintf(princ_name, sizeof(princ_name), "%s@%s", KADM5_ADMIN_SERVICE, global_params.realm);
         if ((retval = krb5_parse_name(util_context, princ_name, &p))) {
-            com_err(progname, retval, "while adding entries to the database");
+            com_err(progname, retval,
+                    _("while adding entries to the database"));
             goto err_nomsg;
         }
         rblock.max_life = ADMIN_LIFETIME;
         rblock.flags = KRB5_KDB_DISALLOW_TGT_BASED;
-        if ((retval = kdb_ldap_create_principal(util_context, p, TGT_KEY, &rblock))) {
+        if ((retval = kdb_ldap_create_principal(util_context, p, TGT_KEY,
+                                                &rblock, &master_keyblock))) {
             krb5_free_principal(util_context, p);
-            com_err(progname, retval, "while adding entries to the database");
+            com_err(progname, retval,
+                    _("while adding entries to the database"));
             goto err_nomsg;
         }
         krb5_free_principal(util_context, p);
@@ -725,15 +717,18 @@ kdb5_ldap_create(int argc, char *argv[])
         /* Create 'kadmin/changepw' ... */
         snprintf(princ_name, sizeof(princ_name), "%s@%s", KADM5_CHANGEPW_SERVICE, global_params.realm);
         if ((retval = krb5_parse_name(util_context, princ_name, &p))) {
-            com_err(progname, retval, "while adding entries to the database");
+            com_err(progname, retval,
+                    _("while adding entries to the database"));
             goto err_nomsg;
         }
         rblock.max_life = CHANGEPW_LIFETIME;
         rblock.flags = KRB5_KDB_DISALLOW_TGT_BASED |
             KRB5_KDB_PWCHANGE_SERVICE;
-        if ((retval = kdb_ldap_create_principal(util_context, p, TGT_KEY, &rblock))) {
+        if ((retval = kdb_ldap_create_principal(util_context, p, TGT_KEY,
+                                                &rblock, &master_keyblock))) {
             krb5_free_principal(util_context, p);
-            com_err(progname, retval, "while adding entries to the database");
+            com_err(progname, retval,
+                    _("while adding entries to the database"));
             goto err_nomsg;
         }
         krb5_free_principal(util_context, p);
@@ -741,26 +736,31 @@ kdb5_ldap_create(int argc, char *argv[])
         /* Create 'kadmin/history' ... */
         snprintf(princ_name, sizeof(princ_name), "%s@%s", KADM5_HIST_PRINCIPAL, global_params.realm);
         if ((retval = krb5_parse_name(util_context, princ_name, &p))) {
-            com_err(progname, retval, "while adding entries to the database");
+            com_err(progname, retval,
+                    _("while adding entries to the database"));
             goto err_nomsg;
         }
         rblock.max_life = global_params.max_life;
         rblock.flags = 0;
-        if ((retval = kdb_ldap_create_principal(util_context, p, TGT_KEY, &rblock))) {
+        if ((retval = kdb_ldap_create_principal(util_context, p, TGT_KEY,
+                                                &rblock, &master_keyblock))) {
             krb5_free_principal(util_context, p);
-            com_err(progname, retval, "while adding entries to the database");
+            com_err(progname, retval,
+                    _("while adding entries to the database"));
             goto err_nomsg;
         }
         krb5_free_principal(util_context, p);
 
         /* Create 'kadmin/<hostname>' ... */
         if ((retval=krb5_sname_to_principal(util_context, NULL, "kadmin", KRB5_NT_SRV_HST, &p))) {
-            com_err(progname, retval, "krb5_sname_to_principal, while adding entries to the database");
+            com_err(progname, retval, _("krb5_sname_to_principal, while "
+                                        "adding entries to the database"));
             goto err_nomsg;
         }
 
         if ((retval=krb5_copy_principal(util_context, p, &temp_p))) {
-            com_err(progname, retval, "krb5_copy_principal, while adding entries to the database");
+            com_err(progname, retval, _("krb5_copy_principal, while adding "
+                                        "entries to the database"));
             goto err_nomsg;
         }
 
@@ -769,15 +769,18 @@ kdb5_ldap_create(int argc, char *argv[])
         temp_p->realm.length = strlen(util_context->default_realm);
         temp_p->realm.data = strdup(util_context->default_realm);
         if (temp_p->realm.data == NULL) {
-            com_err(progname, ENOMEM, "while adding entries to the database");
+            com_err(progname, ENOMEM,
+                    _("while adding entries to the database"));
             goto err_nomsg;
         }
 
         rblock.max_life = ADMIN_LIFETIME;
         rblock.flags = KRB5_KDB_DISALLOW_TGT_BASED;
-        if ((retval = kdb_ldap_create_principal(util_context, temp_p, TGT_KEY, &rblock))) {
+        if ((retval = kdb_ldap_create_principal(util_context, temp_p, TGT_KEY,
+                                                &rblock, &master_keyblock))) {
             krb5_free_principal(util_context, p);
-            com_err(progname, retval, "while adding entries to the database");
+            com_err(progname, retval,
+                    _("while adding entries to the database"));
             goto err_nomsg;
         }
         krb5_free_principal(util_context, temp_p);
@@ -793,7 +796,7 @@ kdb5_ldap_create(int argc, char *argv[])
     if ((mask & LDAP_REALM_KDCSERVERS) || (mask & LDAP_REALM_ADMINSERVERS) ||
         (mask & LDAP_REALM_PASSWDSERVERS)) {
 
-        printf("Changing rights for the service object. Please wait ... ");
+        printf(_("Changing rights for the service object. Please wait ... "));
         fflush(stdout);
 
         rightsmask =0;
@@ -804,8 +807,9 @@ kdb5_ldap_create(int argc, char *argv[])
                 if ((retval=krb5_ldap_add_service_rights(util_context,
                                                          LDAP_KDC_SERVICE, rparams->kdcservers[i],
                                                          rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                    printf("failed\n");
-                    com_err(progname, retval, "while assigning rights to '%s'",
+                    printf(_("failed\n"));
+                    com_err(progname, retval,
+                            _("while assigning rights to '%s'"),
                             rparams->realm_name);
                     goto err_nomsg;
                 }
@@ -820,8 +824,9 @@ kdb5_ldap_create(int argc, char *argv[])
                 if ((retval=krb5_ldap_add_service_rights(util_context,
                                                          LDAP_ADMIN_SERVICE, rparams->adminservers[i],
                                                          rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                    printf("failed\n");
-                    com_err(progname, retval, "while assigning rights to '%s'",
+                    printf(_("failed\n"));
+                    com_err(progname, retval,
+                            _("while assigning rights to '%s'"),
                             rparams->realm_name);
                     goto err_nomsg;
                 }
@@ -836,15 +841,16 @@ kdb5_ldap_create(int argc, char *argv[])
                 if ((retval=krb5_ldap_add_service_rights(util_context,
                                                          LDAP_PASSWD_SERVICE, rparams->passwdservers[i],
                                                          rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                    printf("failed\n");
-                    com_err(progname, retval, "while assigning rights to '%s'",
+                    printf(_("failed\n"));
+                    com_err(progname, retval,
+                            _("while assigning rights to '%s'"),
                             rparams->realm_name);
                     goto err_nomsg;
                 }
             }
         }
 
-        printf("done\n");
+        printf(_("done\n"));
     }
 #endif
     /* The Realm creation is completed. Here is the end of transaction */
@@ -862,14 +868,14 @@ kdb5_ldap_create(int argc, char *argv[])
         else
             mkey_kvno = 1;  /* Default */
 
-        retval = krb5_def_store_mkey(util_context,
-                                     global_params.stash_file,
-                                     master_princ,
-                                     mkey_kvno,
-                                     &master_keyblock, NULL);
+        retval = krb5_db_store_master_key(util_context,
+                                          global_params.stash_file,
+                                          master_princ,
+                                          mkey_kvno,
+                                          &master_keyblock, NULL);
         if (retval) {
-            com_err(progname, errno, "while storing key");
-            printf("Warning: couldn't stash master key.\n");
+            com_err(progname, errno, _("while storing key"));
+            printf(_("Warning: couldn't stash master key.\n"));
         }
     }
 
@@ -897,7 +903,7 @@ cleanup:
 
     if (retval) {
         if (!no_msg) {
-            com_err(progname, retval, "while creating realm '%s'",
+            com_err(progname, retval, _("while creating realm '%s'"),
                     global_params.realm);
         }
         exit_status++;
@@ -950,7 +956,8 @@ kdb5_ldap_modify(int argc, char *argv[])
 
     if ((retval = krb5_ldap_read_krbcontainer_params(util_context,
                                                      &(ldap_context->krbcontainer)))) {
-        com_err(progname, retval, "while reading Kerberos container information");
+        com_err(progname, retval,
+                _("while reading Kerberos container information"));
         goto err_nomsg;
     }
 
@@ -1005,7 +1012,7 @@ kdb5_ldap_modify(int argc, char *argv[])
             } else if (strncmp(argv[i], "", strlen(argv[i]))==0) {
                 /* dont allow subtree value to be set at the root(NULL, "") of the tree */
                 com_err(progname, EINVAL,
-                        "for subtree while modifying realm '%s'",
+                        _("for subtree while modifying realm '%s'"),
                         global_params.realm);
                 goto err_nomsg;
             }
@@ -1016,8 +1023,8 @@ kdb5_ldap_modify(int argc, char *argv[])
                 goto err_usage;
             if (strncmp(argv[i], "", strlen(argv[i]))==0) {
                 /* dont allow containerref value to be set at the root(NULL, "") of the tree */
-                com_err(progname, EINVAL,
-                        "for container reference while modifying realm '%s'",
+                com_err(progname, EINVAL, _("for container reference while "
+                                            "modifying realm '%s'"),
                         global_params.realm);
                 goto err_nomsg;
             }
@@ -1048,7 +1055,8 @@ kdb5_ldap_modify(int argc, char *argv[])
                     (rparams->search_scope != 2)) {
                     retval = EINVAL;
                     com_err(progname, retval,
-                            "specified for search scope while modifying information of realm '%s'",
+                            _("specified for search scope while modifying "
+                              "information of realm '%s'"),
                             global_params.realm);
                     goto err_nomsg;
                 }
@@ -1432,7 +1440,7 @@ kdb5_ldap_modify(int argc, char *argv[])
         else if ((ret_mask= get_ticket_policy(rparams,&i,argv,argc)) !=0) {
             mask|=ret_mask;
         } else {
-            printf("'%s' is an invalid option\n", argv[i]);
+            printf(_("'%s' is an invalid option\n"), argv[i]);
             goto err_usage;
         }
     }
@@ -1446,7 +1454,7 @@ kdb5_ldap_modify(int argc, char *argv[])
     if ((mask & LDAP_REALM_SUBTREE) || (mask & LDAP_REALM_CONTREF) || (mask & LDAP_REALM_KDCSERVERS) ||
         (mask & LDAP_REALM_ADMINSERVERS) || (mask & LDAP_REALM_PASSWDSERVERS)) {
 
-        printf("Changing rights for the service object. Please wait ... ");
+        printf(_("Changing rights for the service object. Please wait ... "));
         fflush(stdout);
 
         if ((mask & LDAP_REALM_SUBTREE) || (mask & LDAP_REALM_CONTREF)) {
@@ -1468,8 +1476,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                             if ((retval=krb5_ldap_delete_service_rights(util_context,
                                                                         LDAP_KDC_SERVICE, kdcdns[i],
                                                                         rparams->realm_name, oldsubtrees, oldcontainerref, rightsmask)) != 0) {
-                                printf("failed\n");
-                                com_err(progname, retval, "while assigning rights '%s'",
+                                printf(_("failed\n"));
+                                com_err(progname, retval,
+                                        _("while assigning rights '%s'"),
                                         rparams->realm_name);
                                 goto err_nomsg;
                             }
@@ -1479,8 +1488,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                         if ((retval=krb5_ldap_add_service_rights(util_context,
                                                                  LDAP_KDC_SERVICE, kdcdns[i],
                                                                  rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                            printf("failed\n");
-                            com_err(progname, retval, "while assigning rights '%s'",
+                            printf(_("failed\n"));
+                            com_err(progname, retval,
+                                    _("while assigning rights '%s'"),
                                     rparams->realm_name);
                             goto err_nomsg;
                         }
@@ -1519,8 +1529,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                         if ((retval=krb5_ldap_delete_service_rights(util_context,
                                                                     LDAP_KDC_SERVICE, oldkdcdns[i],
                                                                     rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                            printf("failed\n");
-                            com_err(progname, retval, "while assigning rights '%s'",
+                            printf(_("failed\n"));
+                            com_err(progname, retval,
+                                    _("while assigning rights '%s'"),
                                     rparams->realm_name);
                             FREE_DN_LIST(newdns);
                             goto err_nomsg;
@@ -1530,8 +1541,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                         if ((retval=krb5_ldap_add_service_rights(util_context,
                                                                  LDAP_KDC_SERVICE, newdns[i],
                                                                  rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                            printf("failed\n");
-                            com_err(progname, retval, "while assigning rights '%s'",
+                            printf(_("failed\n"));
+                            com_err(progname, retval,
+                                    _("while assigning rights '%s'"),
                                     rparams->realm_name);
                             FREE_DN_LIST(newdns);
                             goto err_nomsg;
@@ -1547,8 +1559,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                         if ((retval=krb5_ldap_add_service_rights(util_context,
                                                                  LDAP_KDC_SERVICE, newdns[i],
                                                                  rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                            printf("failed\n");
-                            com_err(progname, retval, "while assigning rights '%s'",
+                            printf(_("failed\n"));
+                            com_err(progname, retval,
+                                    _("while assigning rights '%s'"),
                                     rparams->realm_name);
                             goto err_nomsg;
                         }
@@ -1567,8 +1580,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                         if ((retval=krb5_ldap_delete_service_rights(util_context,
                                                                     LDAP_KDC_SERVICE, oldkdcdns[i],
                                                                     rparams->realm_name, oldsubtrees, oldcontainerref, rightsmask)) != 0) {
-                            printf("failed\n");
-                            com_err(progname, retval, "while assigning rights '%s'",
+                            printf(_("failed\n"));
+                            com_err(progname, retval,
+                                    _("while assigning rights '%s'"),
                                     rparams->realm_name);
                             goto err_nomsg;
                         }
@@ -1578,8 +1592,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                     if ((retval=krb5_ldap_add_service_rights(util_context,
                                                              LDAP_KDC_SERVICE, newdns[i],
                                                              rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                        printf("failed\n");
-                        com_err(progname, retval, "while assigning rights '%s'",
+                        printf(_("failed\n"));
+                        com_err(progname, retval,
+                                _("while assigning rights '%s'"),
                                 rparams->realm_name);
                         goto err_nomsg;
                     }
@@ -1602,8 +1617,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                             if ((retval=krb5_ldap_delete_service_rights(util_context,
                                                                         LDAP_ADMIN_SERVICE, admindns[i],
                                                                         rparams->realm_name, oldsubtrees, oldcontainerref, rightsmask)) != 0) {
-                                printf("failed\n");
-                                com_err(progname, retval, "while assigning rights '%s'",
+                                printf(_("failed\n"));
+                                com_err(progname, retval,
+                                        _("while assigning rights '%s'"),
                                         rparams->realm_name);
                                 goto err_nomsg;
                             }
@@ -1613,8 +1629,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                         if ((retval=krb5_ldap_add_service_rights(util_context,
                                                                  LDAP_ADMIN_SERVICE, admindns[i],
                                                                  rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                            printf("failed\n");
-                            com_err(progname, retval, "while assigning rights '%s'",
+                            printf(_("failed\n"));
+                            com_err(progname, retval,
+                                    _("while assigning rights '%s'"),
                                     rparams->realm_name);
                             goto err_nomsg;
                         }
@@ -1653,8 +1670,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                         if ((retval=krb5_ldap_delete_service_rights(util_context,
                                                                     LDAP_ADMIN_SERVICE, oldadmindns[i],
                                                                     rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                            printf("failed\n");
-                            com_err(progname, retval, "while assigning rights '%s'",
+                            printf(_("failed\n"));
+                            com_err(progname, retval,
+                                    _("while assigning rights '%s'"),
                                     rparams->realm_name);
                             FREE_DN_LIST(newdns);
                             goto err_nomsg;
@@ -1664,8 +1682,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                         if ((retval=krb5_ldap_add_service_rights(util_context,
                                                                  LDAP_ADMIN_SERVICE, newdns[i],
                                                                  rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                            printf("failed\n");
-                            com_err(progname, retval, "while assigning rights '%s'",
+                            printf(_("failed\n"));
+                            com_err(progname, retval,
+                                    _("while assigning rights '%s'"),
                                     rparams->realm_name);
                             FREE_DN_LIST(newdns);
                             goto err_nomsg;
@@ -1681,8 +1700,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                         if ((retval=krb5_ldap_add_service_rights(util_context,
                                                                  LDAP_ADMIN_SERVICE, newdns[i],
                                                                  rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                            printf("failed\n");
-                            com_err(progname, retval, "while assigning rights '%s'",
+                            printf(_("failed\n"));
+                            com_err(progname, retval,
+                                    _("while assigning rights '%s'"),
                                     rparams->realm_name);
                             goto err_nomsg;
                         }
@@ -1701,8 +1721,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                         if ((retval=krb5_ldap_delete_service_rights(util_context,
                                                                     LDAP_ADMIN_SERVICE, oldadmindns[i],
                                                                     rparams->realm_name, oldsubtrees, oldcontainerref, rightsmask)) != 0) {
-                            printf("failed\n");
-                            com_err(progname, retval, "while assigning rights '%s'",
+                            printf(_("failed\n"));
+                            com_err(progname, retval,
+                                    _("while assigning rights '%s'"),
                                     rparams->realm_name);
                             goto err_nomsg;
                         }
@@ -1712,8 +1733,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                     if ((retval=krb5_ldap_add_service_rights(util_context,
                                                              LDAP_ADMIN_SERVICE, newdns[i],
                                                              rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                        printf("failed\n");
-                        com_err(progname, retval, "while assigning rights '%s'",
+                        printf(_("failed\n"));
+                        com_err(progname, retval,
+                                _("while assigning rights '%s'"),
                                 rparams->realm_name);
                         goto err_nomsg;
                     }
@@ -1736,8 +1758,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                             if ((retval=krb5_ldap_delete_service_rights(util_context,
                                                                         LDAP_PASSWD_SERVICE, passwddns[i],
                                                                         rparams->realm_name, oldsubtrees, oldcontainerref, rightsmask)) != 0) {
-                                printf("failed\n");
-                                com_err(progname, retval, "while assigning rights '%s'",
+                                printf(_("failed\n"));
+                                com_err(progname, retval,
+                                        _("while assigning rights '%s'"),
                                         rparams->realm_name);
                                 goto err_nomsg;
                             }
@@ -1747,8 +1770,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                         if ((retval=krb5_ldap_add_service_rights(util_context,
                                                                  LDAP_PASSWD_SERVICE, passwddns[i],
                                                                  rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                            printf("failed\n");
-                            com_err(progname, retval, "while assigning rights '%s'",
+                            printf(_("failed\n"));
+                            com_err(progname, retval,
+                                    _("while assigning rights '%s'"),
                                     rparams->realm_name);
                             goto err_nomsg;
                         }
@@ -1787,8 +1811,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                         if ((retval=krb5_ldap_delete_service_rights(util_context,
                                                                     LDAP_PASSWD_SERVICE, oldpwddns[i],
                                                                     rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                            printf("failed\n");
-                            com_err(progname, retval, "while assigning rights '%s'",
+                            printf(_("failed\n"));
+                            com_err(progname, retval,
+                                    _("while assigning rights '%s'"),
                                     rparams->realm_name);
                             FREE_DN_LIST(newdns);
                             goto err_nomsg;
@@ -1798,8 +1823,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                         if ((retval=krb5_ldap_add_service_rights(util_context,
                                                                  LDAP_PASSWD_SERVICE, newdns[i],
                                                                  rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                            printf("failed\n");
-                            com_err(progname, retval, "while assigning rights '%s'",
+                            printf(_("failed\n"));
+                            com_err(progname, retval,
+                                    _("while assigning rights '%s'"),
                                     rparams->realm_name);
                             FREE_DN_LIST(newdns);
                             goto err_nomsg;
@@ -1815,8 +1841,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                         if ((retval=krb5_ldap_add_service_rights(util_context,
                                                                  LDAP_PASSWD_SERVICE, newdns[i],
                                                                  rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                            printf("failed\n");
-                            com_err(progname, retval, "while assigning rights '%s'",
+                            printf(_("failed\n"));
+                            com_err(progname, retval,
+                                    _("while assigning rights '%s'"),
                                     rparams->realm_name);
                             goto err_nomsg;
                         }
@@ -1835,8 +1862,9 @@ kdb5_ldap_modify(int argc, char *argv[])
                         if ((retval = krb5_ldap_delete_service_rights(util_context,
                                                                       LDAP_PASSWD_SERVICE, oldpwddns[i],
                                                                       rparams->realm_name, oldsubtrees, oldcontainerref, rightsmask)) != 0) {
-                            printf("failed\n");
-                            com_err(progname, retval, "while assigning rights '%s'",
+                            printf(_("failed\n"));
+                            com_err(progname, retval,
+                                    _("while assigning rights '%s'"),
                                     rparams->realm_name);
                             goto err_nomsg;
                         }
@@ -1846,15 +1874,16 @@ kdb5_ldap_modify(int argc, char *argv[])
                     if ((retval = krb5_ldap_add_service_rights(util_context,
                                                                LDAP_PASSWD_SERVICE, newdns[i],
                                                                rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                        printf("failed\n");
-                        com_err(progname, retval, "while assigning rights '%s'",
+                        printf(_("failed\n"));
+                        com_err(progname, retval,
+                                _("while assigning rights '%s'"),
                                 rparams->realm_name);
                         goto err_nomsg;
                     }
                 }
             }
         }
-        printf("done\n");
+        printf(_("done\n"));
     }
 #endif
 
@@ -1918,7 +1947,8 @@ cleanup:
 
     if (retval) {
         if (!no_msg)
-            com_err(progname, retval, "while modifying information of realm '%s'",
+            com_err(progname, retval,
+                    _("while modifying information of realm '%s'"),
                     global_params.realm);
         exit_status++;
     }
@@ -1944,7 +1974,7 @@ kdb5_ldap_view(int argc, char *argv[])
     ldap_context = (krb5_ldap_context *) dal_handle->db_context;
     if (!(ldap_context)) {
         retval = EINVAL;
-        com_err(progname, retval, "while initializing database");
+        com_err(progname, retval, _("while initializing database"));
         exit_status++;
         return;
     }
@@ -1952,14 +1982,15 @@ kdb5_ldap_view(int argc, char *argv[])
     /* Read the kerberos container information */
     if ((retval = krb5_ldap_read_krbcontainer_params(util_context,
                                                      &(ldap_context->krbcontainer))) != 0) {
-        com_err(progname, retval, "while reading kerberos container information");
+        com_err(progname, retval,
+                _("while reading kerberos container information"));
         exit_status++;
         return;
     }
 
     if ((retval = krb5_ldap_read_realm_params(util_context,
                                               global_params.realm, &rparams, &mask)) || (!rparams)) {
-        com_err(progname, retval, "while reading information of realm '%s'",
+        com_err(progname, retval, _("while reading information of realm '%s'"),
                 global_params.realm);
         exit_status++;
         return;
@@ -2005,24 +2036,25 @@ print_realm_params(krb5_ldap_realm_params *rparams, int mask)
     unsigned int num_entry_printed = 0, i = 0;
 
     /* Print the Realm Attributes on the standard output */
-    printf("%25s: %-50s\n", "Realm Name", global_params.realm);
+    printf("%25s: %-50s\n", _("Realm Name"), global_params.realm);
     if (mask & LDAP_REALM_SUBTREE) {
         for (i=0; rparams->subtree[i]!=NULL; i++)
-            printf("%25s: %-50s\n", "Subtree", rparams->subtree[i]);
+            printf("%25s: %-50s\n", _("Subtree"), rparams->subtree[i]);
     }
     if (mask & LDAP_REALM_CONTREF)
-        printf("%25s: %-50s\n", "Principal Container Reference", rparams->containerref);
+        printf("%25s: %-50s\n", _("Principal Container Reference"),
+               rparams->containerref);
     if (mask & LDAP_REALM_SEARCHSCOPE) {
         if ((rparams->search_scope != 1) &&
             (rparams->search_scope != 2)) {
-            printf("%25s: %-50s\n", "SearchScope", "Invalid !");
+            printf("%25s: %-50s\n", _("SearchScope"), _("Invalid !"));
         } else {
-            printf("%25s: %-50s\n", "SearchScope",
+            printf("%25s: %-50s\n", _("SearchScope"),
                    (rparams->search_scope == 1) ? "ONE" : "SUB");
         }
     }
     if (mask & LDAP_REALM_KDCSERVERS) {
-        printf("%25s:", "KDC Services");
+        printf("%25s:", _("KDC Services"));
         if (rparams->kdcservers != NULL) {
             num_entry_printed = 0;
             for (slist = rparams->kdcservers; *slist != NULL; slist++) {
@@ -2037,7 +2069,7 @@ print_realm_params(krb5_ldap_realm_params *rparams, int mask)
             printf("\n");
     }
     if (mask & LDAP_REALM_ADMINSERVERS) {
-        printf("%25s:", "Admin Services");
+        printf("%25s:", _("Admin Services"));
         if (rparams->adminservers != NULL) {
             num_entry_printed = 0;
             for (slist = rparams->adminservers; *slist != NULL; slist++) {
@@ -2052,7 +2084,7 @@ print_realm_params(krb5_ldap_realm_params *rparams, int mask)
             printf("\n");
     }
     if (mask & LDAP_REALM_PASSWDSERVERS) {
-        printf("%25s:", "Passwd Services");
+        printf("%25s:", _("Passwd Services"));
         if (rparams->passwdservers != NULL) {
             num_entry_printed = 0;
             for (slist = rparams->passwdservers; *slist != NULL; slist++) {
@@ -2068,19 +2100,19 @@ print_realm_params(krb5_ldap_realm_params *rparams, int mask)
     }
 
     if (mask & LDAP_REALM_MAXTICKETLIFE) {
-        printf("%25s:", "Maximum Ticket Life");
+        printf("%25s:", _("Maximum Ticket Life"));
         printf(" %s \n", strdur(rparams->max_life));
     }
 
     if (mask & LDAP_REALM_MAXRENEWLIFE) {
-        printf("%25s:", "Maximum Renewable Life");
+        printf("%25s:", _("Maximum Renewable Life"));
         printf(" %s \n", strdur(rparams->max_renewable_life));
     }
 
     if (mask & LDAP_REALM_KRBTICKETFLAGS) {
         int ticketflags = rparams->tktflags;
 
-        printf("%25s: ", "Ticket flags");
+        printf("%25s: ", _("Ticket flags"));
         if (ticketflags & KRB5_KDB_DISALLOW_POSTDATED)
             printf("%s ","DISALLOW_POSTDATED");
 
@@ -2150,7 +2182,8 @@ kdb5_ldap_list(int argc, char *argv[])
     /* Read the kerberos container information */
     if ((retval = krb5_ldap_read_krbcontainer_params(util_context,
                                                      &(ldap_context->krbcontainer))) != 0) {
-        com_err(progname, retval, "while reading kerberos container information");
+        com_err(progname, retval,
+                _("while reading kerberos container information"));
         exit_status++;
         return;
     }
@@ -2159,7 +2192,7 @@ kdb5_ldap_list(int argc, char *argv[])
     if (retval != 0) {
         krb5_ldap_free_krbcontainer_params(ldap_context->krbcontainer);
         ldap_context->krbcontainer = NULL;
-        com_err (progname, retval, "while listing realms");
+        com_err(progname, retval, _("while listing realms"));
         exit_status++;
         return;
     }
@@ -2332,12 +2365,8 @@ kdb_ldap_tgt_keysalt_iterate(krb5_key_salt_tuple *ksent, krb5_pointer ptr)
 
     if (!(kret = krb5_c_make_random_key(context, ksent->ks_enctype,
                                         &key))) {
-        kret = krb5_dbekd_encrypt_key_data(context,
-                                           iargs->rblock->key,
-                                           &key,
-                                           NULL,
-                                           1,
-                                           &entry->key_data[ind]);
+        kret = krb5_dbe_encrypt_key_data(context, iargs->rblock->key, &key,
+                                         NULL, 1, &entry->key_data[ind]);
         krb5_free_keyblock_contents(context, &key);
     }
     /*}*/
@@ -2352,13 +2381,13 @@ kdb_ldap_tgt_keysalt_iterate(krb5_key_salt_tuple *ksent, krb5_pointer ptr)
  */
 static int
 kdb_ldap_create_principal(krb5_context context, krb5_principal princ,
-                          enum ap_op op, struct realm_info *pblock)
+                          enum ap_op op, struct realm_info *pblock,
+                          const krb5_keyblock *master_keyblock)
 {
     int              retval=0, currlen=0, princtype = 2 /* Service Principal */;
     unsigned char    *curr=NULL;
     krb5_tl_data     *tl_data=NULL;
     krb5_db_entry    entry;
-    int              nentry=1;
     long             mask = 0;
     krb5_keyblock    key;
     int              kvno = 0;
@@ -2450,10 +2479,9 @@ kdb_ldap_create_principal(krb5_context context, krb5_principal princ,
                 goto cleanup;
             }
             kvno = 1; /* New key is getting set */
-            retval = krb5_dbekd_encrypt_key_data(context,
-                                                 &ldap_context->lrparams->mkey,
-                                                 &key, NULL, kvno,
-                                                 &entry.key_data[entry.n_key_data - 1]);
+            retval = krb5_dbe_encrypt_key_data(context, master_keyblock,
+                                               &key, NULL, kvno,
+                                               &entry.key_data[entry.n_key_data - 1]);
             krb5_free_keyblock_contents(context, &key);
             if (retval) {
                 goto cleanup;
@@ -2487,10 +2515,9 @@ kdb_ldap_create_principal(krb5_context context, krb5_principal princ,
         memset(entry.key_data, 0, sizeof(krb5_key_data));
         entry.n_key_data++;
         kvno = 1; /* New key is getting set */
-        retval = krb5_dbekd_encrypt_key_data(context, pblock->key,
-                                             &ldap_context->lrparams->mkey,
-                                             NULL, kvno,
-                                             &entry.key_data[entry.n_key_data - 1]);
+        retval = krb5_dbe_encrypt_key_data(context, pblock->key,
+                                           master_keyblock, NULL, kvno,
+                                           &entry.key_data[entry.n_key_data - 1]);
         if (retval) {
             goto cleanup;
         }
@@ -2512,9 +2539,9 @@ kdb_ldap_create_principal(krb5_context context, krb5_principal princ,
         break;
     } /* end of switch */
 
-    retval = krb5_ldap_put_principal(context, &entry, &nentry, NULL);
+    retval = krb5_ldap_put_principal(context, &entry, NULL);
     if (retval) {
-        com_err(NULL, retval, "while adding entries to database");
+        com_err(NULL, retval, _("while adding entries to database"));
         goto cleanup;
     }
 
@@ -2559,8 +2586,9 @@ kdb5_ldap_destroy(int argc, char *argv[])
     }
 
     if (!force) {
-        printf("Deleting KDC database of '%s', are you sure?\n", global_params.realm);
-        printf("(type 'yes' to confirm)? ");
+        printf(_("Deleting KDC database of '%s', are you sure?\n"),
+               global_params.realm);
+        printf(_("(type 'yes' to confirm)? "));
         if (fgets(buf, sizeof(buf), stdin) == NULL) {
             exit_status++;
             return;
@@ -2569,13 +2597,13 @@ kdb5_ldap_destroy(int argc, char *argv[])
             exit_status++;
             return;
         }
-        printf("OK, deleting database of '%s'...\n", global_params.realm);
+        printf(_("OK, deleting database of '%s'...\n"), global_params.realm);
     }
 
     dal_handle = util_context->dal_handle;
     ldap_context = (krb5_ldap_context *) dal_handle->db_context;
     if (!(ldap_context)) {
-        com_err(progname, EINVAL, "while initializing database");
+        com_err(progname, EINVAL, _("while initializing database"));
         exit_status++;
         return;
     }
@@ -2583,7 +2611,8 @@ kdb5_ldap_destroy(int argc, char *argv[])
     /* Read the kerberos container from the LDAP Server */
     if ((retval = krb5_ldap_read_krbcontainer_params(util_context,
                                                      &(ldap_context->krbcontainer))) != 0) {
-        com_err(progname, retval, "while reading kerberos container information");
+        com_err(progname, retval,
+                _("while reading kerberos container information"));
         exit_status++;
         return;
     }
@@ -2591,7 +2620,7 @@ kdb5_ldap_destroy(int argc, char *argv[])
     /* Read the Realm information from the LDAP Server */
     if ((retval = krb5_ldap_read_realm_params(util_context, global_params.realm,
                                               &(ldap_context->lrparams), &mask)) != 0) {
-        com_err(progname, retval, "while reading realm information");
+        com_err(progname, retval, _("while reading realm information"));
         exit_status++;
         return;
     }
@@ -2600,7 +2629,7 @@ kdb5_ldap_destroy(int argc, char *argv[])
     if ((mask & LDAP_REALM_KDCSERVERS) || (mask & LDAP_REALM_ADMINSERVERS) ||
         (mask & LDAP_REALM_PASSWDSERVERS)) {
 
-        printf("Changing rights for the service object. Please wait ... ");
+        printf(_("Changing rights for the service object. Please wait ... "));
         fflush(stdout);
 
         rparams = ldap_context->lrparams;
@@ -2612,8 +2641,9 @@ kdb5_ldap_destroy(int argc, char *argv[])
                 if ((retval = krb5_ldap_delete_service_rights(util_context,
                                                               LDAP_KDC_SERVICE, rparams->kdcservers[i],
                                                               rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                    printf("failed\n");
-                    com_err(progname, retval, "while assigning rights to '%s'",
+                    printf(_("failed\n"));
+                    com_err(progname, retval,
+                            _("while assigning rights to '%s'"),
                             rparams->realm_name);
                     return;
                 }
@@ -2627,8 +2657,9 @@ kdb5_ldap_destroy(int argc, char *argv[])
                 if ((retval = krb5_ldap_delete_service_rights(util_context,
                                                               LDAP_ADMIN_SERVICE, rparams->adminservers[i],
                                                               rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                    printf("failed\n");
-                    com_err(progname, retval, "while assigning rights to '%s'",
+                    printf(_("failed\n"));
+                    com_err(progname, retval,
+                            _("while assigning rights to '%s'"),
                             rparams->realm_name);
                     return;
                 }
@@ -2642,8 +2673,9 @@ kdb5_ldap_destroy(int argc, char *argv[])
                 if ((retval = krb5_ldap_delete_service_rights(util_context,
                                                               LDAP_PASSWD_SERVICE, rparams->passwdservers[i],
                                                               rparams->realm_name, rparams->subtree, rparams->containerref, rightsmask)) != 0) {
-                    printf("failed\n");
-                    com_err(progname, retval, "while assigning rights to '%s'",
+                    printf(_("failed\n"));
+                    com_err(progname, retval,
+                            _("while assigning rights to '%s'"),
                             rparams->realm_name);
                     return;
                 }
@@ -2655,12 +2687,13 @@ kdb5_ldap_destroy(int argc, char *argv[])
     /* Delete the realm container and all the associated principals */
     retval = krb5_ldap_delete_realm(util_context, global_params.realm);
     if (retval) {
-        com_err(progname, retval, "deleting database of '%s'", global_params.realm);
+        com_err(progname, retval,
+                _("deleting database of '%s'"), global_params.realm);
         exit_status++;
         return;
     }
 
-    printf("** Database of '%s' destroyed.\n", global_params.realm);
+    printf(_("** Database of '%s' destroyed.\n"), global_params.realm);
 
     return;
 }

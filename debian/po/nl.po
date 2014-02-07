@@ -1,18 +1,19 @@
 # Dutch krb5 po-debconf translation,
-# Copyright (C) 2008 THE PACKAGE'S COPYRIGHT HOLDER
+# Copyright (C) 2011 THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the krb5 package.
 # Vincent Zweije <zweije@xs4all.nl>, 2008.
+# Vincent Zweije <vincent@zweije.nl>, 2011.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: krb5 1.6.dfsg.4~beta1-3\n"
+"Project-Id-Version: krb5 1.9+dfsg-1\n"
 "Report-Msgid-Bugs-To: krb5@packages.debian.org\n"
-"POT-Creation-Date: 2009-02-21 13:55-0500\n"
-"PO-Revision-Date: 2008-08-19 08:40+0000\n"
-"Last-Translator: Vincent Zweije <zweije@xs4all.nl>\n"
+"POT-Creation-Date: 2009-03-12 15:40-0700\n"
+"PO-Revision-Date: 2011-05-22 17:40+0000\n"
+"Last-Translator: Vincent Zweije <vincent@zweije.nl>\n"
 "Language-Team: Debian-Dutch <debian-l10n-dutch@lists.debian.org>\n"
 "MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
 #. Type: note
@@ -83,21 +84,18 @@ msgstr ""
 #. Description
 #: ../krb5-kdc.templates:2001
 msgid "Create the Kerberos KDC configuration automatically?"
-msgstr "Kerberos KDC instellingen aanmaken met debconf?"
+msgstr "Kerberos KDC configuratie aanmaken met debconf?"
 
 #. Type: boolean
 #. Description
 #: ../krb5-kdc.templates:2001
-#, fuzzy
-#| msgid ""
-#| "The Kerberos Domain Controller (KDC) configuration files, in /etc/"
-#| "krb5kdc, may be created automatically."
 msgid ""
 "The Kerberos Key Distribution Center (KDC) configuration files, in /etc/"
 "krb5kdc, may be created automatically."
 msgstr ""
-"De Kerberos Domain Controller (KDC) instellingsbestanden, in /etc/krb5kdc, "
-"kunnen automatisch worden aangemaakt."
+"De configuratiebestanden van het Kerberos sleuteldistributiecentrum (Key "
+"Distribution Center, KDC), in /etc/krb5kdc, kunnen automatisch worden "
+"aangemaakt."
 
 #. Type: boolean
 #. Description
@@ -116,8 +114,8 @@ msgid ""
 "Administrators who already have infrastructure to manage their Kerberos "
 "configuration may wish to disable these automatic configuration changes."
 msgstr ""
-"Beheerders die reeds infrastructuur hebben om hun Kerberos instellingen te "
-"beheren kunnen deze automatische instellingswijzigingen uitschakelen."
+"Beheerders die reeds infrastructuur hebben om hun Kerberos configuratie te "
+"beheren kunnen deze automatische configuratiewijzigingen uitschakelen."
 
 #. Type: boolean
 #. Description
@@ -146,57 +144,3 @@ msgid ""
 msgstr ""
 "Accepteer deze optie indien u de KDC database nu wilt verwijderen, waarbij "
 "alle gebruikers en wachtwoorden verloren gaan."
-
-#~ msgid "Kerberos V4 compatibility mode to use:"
-#~ msgstr "Te gebruiken Kerberos-V4-compatibiliteitsmodus:"
-
-#~ msgid ""
-#~ "By default, Kerberos V4 requests are allowed from principals that do not "
-#~ "require preauthentication (\"nopreauth\").  This allows Kerberos V4 "
-#~ "services to exist while requiring most users to use Kerberos V5 clients "
-#~ "to get their initial tickets.  These tickets can then be converted to "
-#~ "Kerberos V4 tickets."
-#~ msgstr ""
-#~ "Standaard worden Kerberos-V4-aanvragen toegestaan van principals die geen "
-#~ "pre-authenticatie vereisen (\"zonder preauthentiatie\"). Dit staat toe "
-#~ "dat Kerberos-V4-diensten bestaan, terwijl tegelijkertijd de meeste "
-#~ "gebruikers Kerberos-V5-clients moeten gebruiken voor hun initiële "
-#~ "tickets. Deze Kerberos-V5-tickets kunnen dan in Kerberos-V4-tickets "
-#~ "worden omgezet."
-
-#~ msgid ""
-#~ "Alternatively, the mode can be set to \"full\", allowing Kerberos V4 "
-#~ "clients to get initial tickets even when preauthentication would normally "
-#~ "be required; to \"disable\", returning protocol version errors to all "
-#~ "Kerberos V4 clients; or to \"none\", which tells the KDC to not respond "
-#~ "to Kerberos V4 requests at all."
-#~ msgstr ""
-#~ "Als alternatief kan de modus op \"volledig\" worden gezet, zodat Kerberos-"
-#~ "V4-clients initiële tickets kunnen verkrijgen, zelfs als pre-"
-#~ "authenticatie normaal gesproken vereist zou zijn. Voorts kan de modus op "
-#~ "\"uitgeschakeld\" worden gezet, hetgeen protocol-versiefouten teruggeeft "
-#~ "aan alle Kerberos-V4-clients. Tenslotte kan de modus op \"geen\" worden "
-#~ "gezet, waardoor de de KDC in het geheel niets op Kerberos-V4-aanvragen "
-#~ "zal teruggeven."
-
-#~ msgid "Run a Kerberos V5 to Kerberos V4 ticket conversion daemon?"
-#~ msgstr ""
-#~ "Een achtergronddienst starten voor het converteren van Kerberos-V5- naar "
-#~ "Kerberos-V4-tickets?"
-
-#~ msgid ""
-#~ "The krb524d daemon converts Kerberos V5 tickets into Kerberos V4 tickets "
-#~ "for programs, such as krb524init, that obtain Kerberos V4 tickets for "
-#~ "compatibility with old applications."
-#~ msgstr ""
-#~ "De achtergronddienst krb524d zet Kerberos-V5-tickets om in Kerberos-V4-"
-#~ "tickets, voor programma's zoals krb524init, die Kerberos-V4-tickets "
-#~ "aanvragen voor compatibiliteit met oude applicaties."
-
-#~ msgid ""
-#~ "It is recommended to enable that daemon if Kerberos V4 is enabled, "
-#~ "especially when Kerberos V4 compatibility is set to \"nopreauth\"."
-#~ msgstr ""
-#~ "Het wordt aanbevolen om die achtergronddienst in te schakelen als "
-#~ "Kerberos-V4 is aangezet, in het bijzonder wanneer Kerberos-V4-"
-#~ "compatibiliteit op \"zonder preauthentiatie\" staat."

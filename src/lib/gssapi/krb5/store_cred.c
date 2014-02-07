@@ -1,7 +1,6 @@
-/* -*- mode: c; indent-tabs-mode: nil -*- */
+/* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/gssapi/krb5/store_cred.c */
 /*
- * lib/gssapi/krb5/store_cred.c
- *
  * Copyright 2009 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,8 +22,6 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
  */
 
 #include <assert.h>
@@ -133,7 +130,7 @@ cleanup:
     return major_status;
 }
 
-OM_uint32
+OM_uint32 KRB5_CALLCONV
 krb5_gss_store_cred(OM_uint32 *minor_status,
                     gss_cred_id_t input_cred_handle,
                     gss_cred_usage_t cred_usage,
@@ -185,4 +182,3 @@ krb5_gss_store_cred(OM_uint32 *minor_status,
 
     return GSS_S_COMPLETE;
 }
-

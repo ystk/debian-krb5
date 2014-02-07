@@ -49,7 +49,7 @@
 #include <string.h>
 #ifdef _WIN32
 #include <windows.h>
-#include <winsock.h>
+#include <winsock2.h>
 #else
 #include <assert.h>
 #include <unistd.h>
@@ -64,15 +64,23 @@
 #endif
 
 #include <gssapi/gssapi_generic.h>
+#include <gssapi/gssapi_krb5.h>
+#include <gssapi/gssapi_ext.h>
 #include "gss-misc.h"
+#include "port-sockets.h"
 
 static int verbose = 1;
+static int spnego = 0;
+static gss_OID_desc gss_spnego_mechanism_oid_desc =
+{6, (void *)"\x2b\x06\x01\x05\x05\x02"};
 
 static void
 usage()
 {
-    fprintf(stderr, "Usage: gss-client [-port port] [-mech mechanism] [-d]\n");
-    fprintf(stderr, "       [-seq] [-noreplay] [-nomutual]");
+    fprintf(stderr, "Usage: gss-client [-port port] [-mech mechanism] "
+            "[-spnego] [-d]\n");
+    fprintf(stderr, "       [-seq] [-noreplay] [-nomutual] [-user user] "
+            "[-pass pw]");
 #ifdef _WIN32
     fprintf(stderr, " [-threads num]");
 #endif
@@ -107,6 +115,15 @@ connect_to_server(char *host, u_short port)
     struct hostent *hp;
     int     s;
 
+#ifdef _WIN32
+    WSADATA wsadata;
+    int wsastartuperror = WSAStartup(0x202, &wsadata);
+    if (wsastartuperror) {
+        fprintf(stderr, "WSAStartup error: %x\n", wsastartuperror);
+        return -1;
+    }
+#endif
+
     if ((hp = gethostbyname(host)) == NULL) {
         fprintf(stderr, "Unknown host: %s\n", host);
         return -1;
@@ -122,7 +139,7 @@ connect_to_server(char *host, u_short port)
     }
     if (connect(s, (struct sockaddr *) &saddr, sizeof(saddr)) < 0) {
         perror("connecting to server");
-        (void) close(s);
+        (void) closesocket(s);
         return -1;
     }
     return s;
@@ -162,6 +179,7 @@ connect_to_server(char *host, u_short port)
 static int
 client_establish_context(int s, char *service_name, OM_uint32 gss_flags,
                          int auth_flag, int v1_format, gss_OID oid,
+                         char *username, char *password,
                          gss_ctx_id_t *gss_context, OM_uint32 *ret_flags)
 {
     if (auth_flag) {
@@ -169,6 +187,74 @@ client_establish_context(int s, char *service_name, OM_uint32 gss_flags,
         gss_name_t target_name;
         OM_uint32 maj_stat, min_stat, init_sec_min_stat;
         int token_flags;
+        gss_cred_id_t cred = GSS_C_NO_CREDENTIAL;
+        gss_name_t gss_username = GSS_C_NO_NAME;
+        gss_OID_set_desc mechs, *mechsp = GSS_C_NO_OID_SET;
+
+        if (spnego) {
+            mechs.elements = &gss_spnego_mechanism_oid_desc;
+            mechs.count = 1;
+            mechsp = &mechs;
+        } else if (oid != GSS_C_NO_OID) {
+            mechs.elements = oid;
+            mechs.count = 1;
+            mechsp = &mechs;
+        } else {
+            mechs.elements = NULL;
+            mechs.count = 0;
+        }
+
+        if (username != NULL) {
+            send_tok.value = username;
+            send_tok.length = strlen(username);
+
+            maj_stat = gss_import_name(&min_stat, &send_tok,
+                                       (gss_OID) gss_nt_user_name,
+                                       &gss_username);
+            if (maj_stat != GSS_S_COMPLETE) {
+                display_status("parsing client name", maj_stat, min_stat);
+                return -1;
+            }
+        }
+
+        if (password != NULL) {
+            gss_buffer_desc pwbuf;
+
+            pwbuf.value = password;
+            pwbuf.length = strlen(password);
+
+            maj_stat = gss_acquire_cred_with_password(&min_stat,
+                                                      gss_username,
+                                                      &pwbuf, 0,
+                                                      mechsp, GSS_C_INITIATE,
+                                                      &cred, NULL, NULL);
+        } else if (gss_username != GSS_C_NO_NAME) {
+            maj_stat = gss_acquire_cred(&min_stat,
+                                        gss_username, 0,
+                                        mechsp, GSS_C_INITIATE,
+                                        &cred, NULL, NULL);
+        } else
+            maj_stat = GSS_S_COMPLETE;
+        if (maj_stat != GSS_S_COMPLETE) {
+            display_status("acquiring creds", maj_stat, min_stat);
+            gss_release_name(&min_stat, &gss_username);
+            return -1;
+        }
+        if (spnego && oid != GSS_C_NO_OID) {
+            gss_OID_set_desc neg_mechs;
+
+            neg_mechs.elements = oid;
+            neg_mechs.count = 1;
+
+            maj_stat = gss_set_neg_mechs(&min_stat, cred, &neg_mechs);
+            if (maj_stat != GSS_S_COMPLETE) {
+                display_status("setting neg mechs", maj_stat, min_stat);
+                gss_release_name(&min_stat, &gss_username);
+                gss_release_cred(&min_stat, &cred);
+                return -1;
+            }
+        }
+        gss_release_name(&min_stat, &gss_username);
 
         /*
          * Import the name into target_name.  Use send_tok to save
@@ -213,8 +299,9 @@ client_establish_context(int s, char *service_name, OM_uint32 gss_flags,
 
         do {
             maj_stat = gss_init_sec_context(&init_sec_min_stat,
-                                            GSS_C_NO_CREDENTIAL, gss_context,
-                                            target_name, oid, gss_flags, 0,
+                                            cred, gss_context,
+                                            target_name, mechs.elements,
+                                            gss_flags, 0,
                                             NULL, /* channel bindings */
                                             token_ptr, NULL, /* mech type */
                                             &send_tok, ret_flags,
@@ -260,6 +347,7 @@ client_establish_context(int s, char *service_name, OM_uint32 gss_flags,
                 printf("\n");
         } while (maj_stat == GSS_S_CONTINUE_NEEDED);
 
+        (void) gss_release_cred(&min_stat, &cred);
         (void) gss_release_name(&min_stat, &target_name);
     } else {
         if (send_token(s, TOKEN_NOOP, empty_token) < 0)
@@ -307,7 +395,7 @@ read_file(file_name, in_buf)
         perror("read");
         exit(1);
     }
-    if (count < in_buf->length)
+    if (count < (int)in_buf->length)
         fprintf(stderr, "Warning, only read in %d bytes, expected %d\n",
                 count, (int) in_buf->length);
 }
@@ -344,7 +432,7 @@ read_file(file_name, in_buf)
 static int
 call_server(host, port, oid, service_name, gss_flags, auth_flag,
             wrap_flag, encrypt_flag, mic_flag, v1_format, msg, use_file,
-            mcount)
+            mcount, username, password)
     char   *host;
     u_short port;
     gss_OID oid;
@@ -355,8 +443,10 @@ call_server(host, port, oid, service_name, gss_flags, auth_flag,
     char   *msg;
     int     use_file;
     int     mcount;
+    char    *username;
+    char    *password;
 {
-    gss_ctx_id_t context;
+    gss_ctx_id_t context = GSS_C_NO_CONTEXT;
     gss_buffer_desc in_buf, out_buf;
     int     s, state;
     OM_uint32 ret_flags;
@@ -380,8 +470,9 @@ call_server(host, port, oid, service_name, gss_flags, auth_flag,
 
     /* Establish context */
     if (client_establish_context(s, service_name, gss_flags, auth_flag,
-                                 v1_format, oid, &context, &ret_flags) < 0) {
-        (void) close(s);
+                                 v1_format, oid, username, password,
+                                 &context, &ret_flags) < 0) {
+        (void) closesocket(s);
         return -1;
     }
 
@@ -469,17 +560,17 @@ call_server(host, port, oid, service_name, gss_flags, auth_flag,
     } else {
         /* Seal the message */
         in_buf.value = msg;
-        in_buf.length = strlen(msg);
+        in_buf.length = strlen((char *)in_buf.value);
     }
 
-    for (i = 0; i < mcount; i++) {
+    for (i = 0; i < (size_t)mcount; i++) {
         if (wrap_flag) {
             maj_stat =
                 gss_wrap(&min_stat, context, encrypt_flag, GSS_C_QOP_DEFAULT,
                          &in_buf, &state, &out_buf);
             if (maj_stat != GSS_S_COMPLETE) {
                 display_status("wrapping message", maj_stat, min_stat);
-                (void) close(s);
+                (void) closesocket(s);
                 (void) gss_delete_sec_context(&min_stat, &context,
                                               GSS_C_NO_BUFFER);
                 return -1;
@@ -497,7 +588,7 @@ call_server(host, port, oid, service_name, gss_flags, auth_flag,
                               (encrypt_flag ? TOKEN_ENCRYPTED : 0) |
                               (mic_flag ? TOKEN_SEND_MIC : 0))),
                        &out_buf) < 0) {
-            (void) close(s);
+            (void) closesocket(s);
             (void) gss_delete_sec_context(&min_stat, &context,
                                           GSS_C_NO_BUFFER);
             return -1;
@@ -507,7 +598,7 @@ call_server(host, port, oid, service_name, gss_flags, auth_flag,
 
         /* Read signature block into out_buf */
         if (recv_token(s, &token_flags, &out_buf) < 0) {
-            (void) close(s);
+            (void) closesocket(s);
             (void) gss_delete_sec_context(&min_stat, &context,
                                           GSS_C_NO_BUFFER);
             return -1;
@@ -519,7 +610,7 @@ call_server(host, port, oid, service_name, gss_flags, auth_flag,
                                       &out_buf, &qop_state);
             if (maj_stat != GSS_S_COMPLETE) {
                 display_status("verifying signature", maj_stat, min_stat);
-                (void) close(s);
+                (void) closesocket(s);
                 (void) gss_delete_sec_context(&min_stat, &context,
                                               GSS_C_NO_BUFFER);
                 return -1;
@@ -547,7 +638,7 @@ call_server(host, port, oid, service_name, gss_flags, auth_flag,
         maj_stat = gss_delete_sec_context(&min_stat, &context, &out_buf);
         if (maj_stat != GSS_S_COMPLETE) {
             display_status("deleting context", maj_stat, min_stat);
-            (void) close(s);
+            (void) closesocket(s);
             (void) gss_delete_sec_context(&min_stat, &context,
                                           GSS_C_NO_BUFFER);
             return -1;
@@ -556,7 +647,8 @@ call_server(host, port, oid, service_name, gss_flags, auth_flag,
         (void) gss_release_buffer(&min_stat, &out_buf);
     }
 
-    (void) close(s);
+    (void) closesocket(s);
+
     return 0;
 }
 
@@ -663,13 +755,15 @@ static OM_uint32 min_stat;
 static gss_OID oid = GSS_C_NULL_OID;
 static int mcount = 1, ccount = 1;
 static int auth_flag, wrap_flag, encrypt_flag, mic_flag, v1_format;
+static char *username = NULL;
+static char *password = NULL;
 
 static void
 worker_bee(void *unused)
 {
     if (call_server(server_host, port, oid, service_name,
                     gss_flags, auth_flag, wrap_flag, encrypt_flag, mic_flag,
-                    v1_format, msg, use_file, mcount) < 0)
+                    v1_format, msg, use_file, mcount, username, password) < 0)
         exit(1);
 
 #ifdef _WIN32
@@ -705,17 +799,35 @@ main(argc, argv)
             if (!argc)
                 usage();
             mechanism = *argv;
-        }
+        } else if (strcmp(*argv, "-user") == 0) {
+            argc--;
+            argv++;
+            if (!argc)
+                usage();
+            username = *argv;
+        } else if (strcmp(*argv, "-pass") == 0) {
+            argc--;
+            argv++;
+            if (!argc)
+                usage();
+            password = *argv;
+        } else if (strcmp(*argv, "-iakerb") == 0) {
+            mechanism = "{ 1 3 6 1 5 2 5 }";
+        } else if (strcmp(*argv, "-spnego") == 0) {
+            spnego = 1;
+        } else if (strcmp(*argv, "-krb5") == 0) {
+            mechanism = "{ 1 3 5 1 5 2 }";
 #ifdef _WIN32
-        else if (strcmp(*argv, "-threads") == 0) {
+        } else if (strcmp(*argv, "-threads") == 0) {
             argc--;
             argv++;
             if (!argc)
                 usage();
             max_threads = atoi(*argv);
-        }
 #endif
-        else if (strcmp(*argv, "-d") == 0) {
+        } else if (strcmp(*argv, "-dce") == 0) {
+            gss_flags |= GSS_C_DCE_STYLE;
+        } else if (strcmp(*argv, "-d") == 0) {
             gss_flags |= GSS_C_DELEG_FLAG;
         } else if (strcmp(*argv, "-seq") == 0) {
             gss_flags |= GSS_C_SEQUENCE_FLAG;

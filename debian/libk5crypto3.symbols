@@ -2,6 +2,9 @@ libk5crypto.so.3 libk5crypto3 #MINVER#
  HIDDEN@HIDDEN 1.6.dfsg.2
  is_coll_proof_cksum@k5crypto_3_MIT 1.6.dfsg.2
  is_keyed_cksum@k5crypto_3_MIT 1.6.dfsg.2
+ k5_sha256_final@k5crypto_3_MIT 1.10+dfsg~alpha1
+ k5_sha256_init@k5crypto_3_MIT 1.10+dfsg~alpha1
+ k5_sha256_update@k5crypto_3_MIT 1.10+dfsg~alpha1
  k5crypto_3_MIT@k5crypto_3_MIT 1.6.dfsg.2
  krb5_c_block_size@k5crypto_3_MIT 1.6.dfsg.2
  krb5_c_checksum_length@k5crypto_3_MIT 1.6.dfsg.2
@@ -45,6 +48,7 @@ libk5crypto.so.3 libk5crypto3 #MINVER#
  krb5_encrypt@k5crypto_3_MIT 1.6.dfsg.2
  krb5_encrypt_data@k5crypto_3_MIT 1.6.dfsg.2
  krb5_encrypt_size@k5crypto_3_MIT 1.6.dfsg.2
+ krb5_enctype_to_name@k5crypto_3_MIT 1.9+dfsg~beta1
  krb5_enctype_to_string@k5crypto_3_MIT 1.6.dfsg.2
  krb5_finish_key@k5crypto_3_MIT 1.6.dfsg.2
  krb5_finish_random_key@k5crypto_3_MIT 1.6.dfsg.2
@@ -71,13 +75,9 @@ libk5crypto.so.3 libk5crypto3 #MINVER#
  krb5_string_to_key@k5crypto_3_MIT 1.6.dfsg.2
  krb5_use_enctype@k5crypto_3_MIT 1.6.dfsg.2
  krb5_verify_checksum@k5crypto_3_MIT 1.6.dfsg.2
- krb5int_MD4Final@k5crypto_3_MIT 1.8+dfsg
- krb5int_MD4Init@k5crypto_3_MIT 1.8+dfsg
- krb5int_MD4Update@k5crypto_3_MIT 1.8+dfsg
- krb5int_MD5Final@k5crypto_3_MIT 1.8+dfsg
- krb5int_MD5Init@k5crypto_3_MIT 1.8+dfsg
- krb5int_MD5Update@k5crypto_3_MIT 1.8+dfsg
  krb5int_aes_decrypt@k5crypto_3_MIT 1.6.dfsg.2
+ krb5int_aes_enc_blk@k5crypto_3_MIT 1.10+dfsg~alpha1
+ krb5int_aes_enc_key@k5crypto_3_MIT 1.10+dfsg~alpha1
  krb5int_aes_encrypt@k5crypto_3_MIT 1.6.dfsg.2
  krb5int_arcfour_gsscrypt@k5crypto_3_MIT 1.8+dfsg
  krb5int_c_combine_keys@k5crypto_3_MIT 1.6.dfsg.2
@@ -88,12 +88,19 @@ libk5crypto.so.3 libk5crypto3 #MINVER#
  krb5int_c_init_keyblock@k5crypto_3_MIT 1.6.dfsg.2
  krb5int_c_mandatory_cksumtype@k5crypto_3_MIT 1.6.dfsg.2
  krb5int_c_weak_enctype@k5crypto_3_MIT 1.8+dfsg
+ krb5int_camellia_cbc_mac@k5crypto_3_MIT 1.9+dfsg~beta1
+ krb5int_cmac_checksum@k5crypto_3_MIT 1.9+dfsg~beta1
+ krb5int_derive_key@k5crypto_3_MIT 1.9+dfsg~beta2
+ krb5int_enc_aes128@k5crypto_3_MIT 1.9+dfsg~beta2
+ krb5int_enc_aes256@k5crypto_3_MIT 1.9+dfsg~beta2
  krb5int_enc_arcfour@k5crypto_3_MIT 1.6.dfsg.2
+ krb5int_enc_camellia128@k5crypto_3_MIT 1.9+dfsg~beta2
+ krb5int_enc_camellia256@k5crypto_3_MIT 1.9+dfsg~beta2
  krb5int_enc_des3@k5crypto_3_MIT 1.6.dfsg.2
+ krb5int_hash_md4@k5crypto_3_MIT 1.10+dfsg~alpha1
  krb5int_hash_md5@k5crypto_3_MIT 1.6.dfsg.2
  krb5int_hmac@k5crypto_3_MIT 1.8+dfsg
+ krb5int_nfold@k5crypto_3_MIT 1.10+dfsg~alpha1
  mit_crc32@k5crypto_3_MIT 1.6.dfsg.2
- mit_des_fixup_key_parity@k5crypto_3_MIT 1.6.dfsg.2
- mit_des_is_weak_key@k5crypto_3_MIT 1.6.dfsg.2
  valid_cksumtype@k5crypto_3_MIT 1.6.dfsg.2
  valid_enctype@k5crypto_3_MIT 1.6.dfsg.2

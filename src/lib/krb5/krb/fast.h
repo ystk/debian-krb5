@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/krb/fast.h */
 /*
- * lib/krb5/krb/fast.h
- *
  * Copyright (C) 2009 by the Massachusetts Institute of Technology.
  * All rights reserved.
  *
@@ -23,10 +22,8 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
- * <<< Description >>>
  */
+
 #ifndef KRB_FAST_H
 
 #define KRB_FAST_H
@@ -46,40 +43,52 @@ struct krb5int_fast_request_state {
 #define KRB5INT_FAST_ARMOR_AVAIL (1l<<1)
 
 krb5_error_code
-krb5int_fast_prep_req_body(krb5_context context, struct krb5int_fast_request_state *state,
-                           krb5_kdc_req *request, krb5_data **encoded_req_body);
+krb5int_fast_prep_req_body(krb5_context context,
+                           struct krb5int_fast_request_state *state,
+                           krb5_kdc_req *request,
+                           krb5_data **encoded_req_body);
 
-typedef krb5_error_code(*kdc_req_encoder_proc) (const krb5_kdc_req *, krb5_data **);
+typedef krb5_error_code (*kdc_req_encoder_proc)(const krb5_kdc_req *,
+                                                krb5_data **);
 
 krb5_error_code
-krb5int_fast_prep_req (krb5_context context, struct krb5int_fast_request_state *state,
-                       krb5_kdc_req *request,
-                       const krb5_data *to_be_checksummed, kdc_req_encoder_proc encoder,
-                       krb5_data **encoded_request);
+krb5int_fast_prep_req(krb5_context context,
+                      struct krb5int_fast_request_state *state,
+                      krb5_kdc_req *request,
+                      const krb5_data *to_be_checksummed,
+                      kdc_req_encoder_proc encoder,
+                      krb5_data **encoded_request);
+
 krb5_error_code
-krb5int_fast_process_error(krb5_context context, struct krb5int_fast_request_state *state,
-                           krb5_error **err_replyptr                       , krb5_pa_data ***out_padata,
+krb5int_fast_process_error(krb5_context context,
+                           struct krb5int_fast_request_state *state,
+                           krb5_error **err_replyptr,
+                           krb5_pa_data ***out_padata,
                            krb5_boolean *retry);
 
-krb5_error_code krb5int_fast_process_response
-(krb5_context context, struct krb5int_fast_request_state *state,
- krb5_kdc_rep *resp,
- krb5_keyblock **strengthen_key);
+krb5_error_code
+krb5int_fast_process_response(krb5_context context,
+                              struct krb5int_fast_request_state *state,
+                              krb5_kdc_rep *resp,
+                              krb5_keyblock **strengthen_key);
 
 krb5_error_code
-krb5int_fast_make_state( krb5_context context, struct krb5int_fast_request_state **state);
+krb5int_fast_make_state(krb5_context context,
+                        struct krb5int_fast_request_state **state);
 
 void
-krb5int_fast_free_state( krb5_context , struct krb5int_fast_request_state *state);
-krb5_error_code krb5int_fast_as_armor
-(krb5_context context, struct krb5int_fast_request_state *state,
- krb5_gic_opt_ext *opte,
- krb5_kdc_req *request);
+krb5int_fast_free_state(krb5_context context,
+                        struct krb5int_fast_request_state *state);
 
-krb5_error_code krb5int_fast_reply_key(krb5_context context,
-                                       krb5_keyblock *strengthen_key,
-                                       krb5_keyblock *existing_key,
-                                       krb5_keyblock *output_key);
+krb5_error_code
+krb5int_fast_as_armor(krb5_context context,
+                      struct krb5int_fast_request_state *state,
+                      krb5_gic_opt_ext *opte, krb5_kdc_req *request);
+
+krb5_error_code
+krb5int_fast_reply_key(krb5_context context,
+                       krb5_keyblock *strengthen_key,
+                       krb5_keyblock *existing_key, krb5_keyblock *output_key);
 
 
 krb5_error_code

@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* plugins/kdb/ldap/libkdb_ldap/ldap_create.c */
 /*
- * lib/kdb/kdb_ldap/ldap_create.c
- *
  * Copyright (c) 2004-2005, Novell, Inc.
  * All rights reserved.
  *
@@ -219,11 +218,13 @@ krb5_ldap_create(krb5_context context, char *conf_section, char **db_args)
                  * temporary is passed in when kdb5_util load without -update is done.
                  * This is unsupported by the LDAP plugin.
                  */
-                krb5_set_error_message (context, status,
-                                        "creation of LDAP entries aborted, plugin requires -update argument");
+                krb5_set_error_message(context, status,
+                                       _("creation of LDAP entries aborted, "
+                                         "plugin requires -update argument"));
             } else {
-                krb5_set_error_message (context, status, "unknown option \'%s\'",
-                                        opt?opt:val);
+                krb5_set_error_message(context, status,
+                                       _("unknown option \'%s\'"),
+                                       opt?opt:val);
             }
             free(opt);
             free(val);
@@ -257,7 +258,7 @@ krb5_ldap_create(krb5_context context, char *conf_section, char **db_args)
         if (ldap_context->conf_section) {
             if ((status = profile_get_string(context->profile,
                                              KDB_MODULE_SECTION, ldap_context->conf_section,
-                                             "ldap_kerberos_container_dn", NULL,
+                                             KRB5_CONF_LDAP_KERBEROS_CONTAINER_DN, NULL,
                                              &kparams.DN)) != 0) {
                 goto cleanup;
             }
@@ -265,7 +266,7 @@ krb5_ldap_create(krb5_context context, char *conf_section, char **db_args)
         if (kparams.DN == NULL) {
             if ((status = profile_get_string(context->profile,
                                              KDB_MODULE_DEF_SECTION,
-                                             "ldap_kerberos_container_dn", NULL,
+                                             KRB5_CONF_LDAP_KERBEROS_CONTAINER_DN, NULL,
                                              NULL, &kparams.DN)) != 0) {
                 goto cleanup;
             }
@@ -366,7 +367,8 @@ cleanup:
         rc = krb5_ldap_delete_krbcontainer(context,
                                            ((kparams.DN != NULL) ? &kparams : NULL));
         krb5_set_error_message(context, rc,
-                               "could not complete roll-back, error deleting Kerberos Container");
+                               _("could not complete roll-back, error "
+                                 "deleting Kerberos Container"));
     }
 
     /* should call krb5_ldap_free_krbcontainer_params() but can't */

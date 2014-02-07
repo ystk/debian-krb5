@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/gssapi/krb5/k5sealv3iov.c */
 /*
- * lib/gssapi/krb5/k5sealv3iov.c
- *
  * Copyright 2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,8 +22,6 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
  */
 
 #include <assert.h>
@@ -268,6 +265,8 @@ gss_krb5int_make_seal_token_v3_iov(krb5_context context,
     }
 
     code = 0;
+    if (conf_state != NULL)
+        *conf_state = conf_req_flag;
 
 cleanup:
     if (code != 0)

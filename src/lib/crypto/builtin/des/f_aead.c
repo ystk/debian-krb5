@@ -22,9 +22,9 @@
  * express or implied warranty.
  */
 
+#include "crypto_int.h"
 #include "des_int.h"
 #include "f_tables.h"
-#include "aead.h"
 
 const mit_des_cblock mit_des_zeroblock /* = all zero */;
 
@@ -54,9 +54,8 @@ krb5int_des_cbc_encrypt(krb5_crypto_iov *data, unsigned long num_data,
     for (;;) {
         unsigned DES_INT32 temp;
 
-        ptr = iov_next_block(storage, MIT_DES_BLOCK_LENGTH, data, num_data,
-                             &input_pos);
-        if (ptr == NULL)
+        if (!krb5int_c_iov_get_block_nocopy(storage, MIT_DES_BLOCK_LENGTH,
+                                            data, num_data, &input_pos, &ptr))
             break;
         block = ptr;
 
@@ -66,14 +65,15 @@ krb5int_des_cbc_encrypt(krb5_crypto_iov *data, unsigned long num_data,
         GET_HALF_BLOCK(temp, ptr);
         right ^= temp;
 
-        /* Encrypt what we have and store back into block. */
+        /* Encrypt what we have and put back into block. */
         DES_DO_ENCRYPT(left, right, kp);
         ptr = block;
         PUT_HALF_BLOCK(left, ptr);
         PUT_HALF_BLOCK(right, ptr);
 
-        iov_store_block(data, num_data, block, storage, MIT_DES_BLOCK_LENGTH,
-                        &output_pos);
+        krb5int_c_iov_put_block_nocopy(data, num_data, storage,
+                                       MIT_DES_BLOCK_LENGTH, &output_pos,
+                                       block);
     }
 
     if (ivec != NULL && block != NULL) {
@@ -115,9 +115,8 @@ krb5int_des_cbc_decrypt(krb5_crypto_iov *data, unsigned long num_data,
 
     /* Work the length down 8 bytes at a time. */
     for (;;) {
-        ptr = iov_next_block(storage, MIT_DES_BLOCK_LENGTH, data, num_data,
-                             &input_pos);
-        if (ptr == NULL)
+        if (!krb5int_c_iov_get_block_nocopy(storage, MIT_DES_BLOCK_LENGTH,
+                                            data, num_data, &input_pos, &ptr))
             break;
         block = ptr;
 
@@ -141,8 +140,9 @@ krb5int_des_cbc_decrypt(krb5_crypto_iov *data, unsigned long num_data,
         ocipherl = cipherl;
         ocipherr = cipherr;
 
-        iov_store_block(data, num_data, block, storage, MIT_DES_BLOCK_LENGTH,
-                        &output_pos);
+        krb5int_c_iov_put_block_nocopy(data, num_data, storage,
+                                       MIT_DES_BLOCK_LENGTH, &output_pos,
+                                       block);
     }
 
     if (ivec != NULL && block != NULL) {
@@ -161,7 +161,7 @@ krb5int_des_cbc_mac(const krb5_crypto_iov *data, unsigned long num_data,
     const unsigned DES_INT32 *kp;
     const unsigned char *ip;
     struct iov_block_state input_pos;
-    unsigned char storage[MIT_DES_BLOCK_LENGTH], *block = NULL, *ptr;
+    unsigned char storage[MIT_DES_BLOCK_LENGTH], *ptr;
 
     IOV_BLOCK_STATE_INIT(&input_pos);
     input_pos.include_sign_only = 1;
@@ -178,11 +178,9 @@ krb5int_des_cbc_mac(const krb5_crypto_iov *data, unsigned long num_data,
     for (;;) {
         unsigned DES_INT32 temp;
 
-        ptr = iov_next_block(storage, MIT_DES_BLOCK_LENGTH, data, num_data,
-                             &input_pos);
-        if (ptr == NULL)
+        if (!krb5int_c_iov_get_block_nocopy(storage, MIT_DES_BLOCK_LENGTH,
+                                            data, num_data, &input_pos, &ptr))
             break;
-        block = ptr;
 
         /* Decompose this block and xor it with the previous ciphertext. */
         GET_HALF_BLOCK(temp, ptr);

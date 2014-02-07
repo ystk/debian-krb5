@@ -92,14 +92,14 @@ This
 .B string
 specifies the location of the access control list (acl) file that
 kadmin uses to determine which principals are allowed which permissions
-on the database. The default value is /etc/krb5kdc/kadm5.acl.
+on the database. The default value is /usr/local/var/krb5kdc/kadm5.acl.
 
 .IP admin_keytab
 This
 .B string
 Specifies the location of the keytab file that kadmin uses to
 authenticate to the database.  The default value is
-/etc/krb5kdc/kadm5.keytab.
+/usr/local/var/krb5kdc/kadm5.keytab.
 
 .IP database_name
 This
@@ -235,7 +235,7 @@ represents the master key's key type.
 .IP max_life
 This
 .B delta time string
-specifes the maximum time period that a ticket may be valid for in
+specifies the maximum time period that a ticket may be valid for in
 this realm.  
 
 .IP max_renewable_life
@@ -259,7 +259,7 @@ incremental propagation.  The maximum value is 2500; default is 1000.
 .IP iprop_slave_poll
 This
 .B delta time string
-specfies how often the slave KDC polls for new updates from the
+specifies how often the slave KDC polls for new updates from the
 master.  Default is "2m" (that is, two minutes).
 
 .IP supported_enctypes
@@ -274,7 +274,7 @@ tickets should be checked against the transit path computed from the
 realm names and the [capaths] section of its krb5.conf file
 
 .SH FILES 
-/etc/krb5kdc/kdc.conf
+/usr/local/var/krb5kdc/kdc.conf
 
 .SH SEE ALSO
 krb5.conf(5), krb5kdc(8)

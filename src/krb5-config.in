@@ -117,7 +117,6 @@ if test -n "$do_help"; then
     echo "        [--prefix]        Kerberos installed prefix"
     echo "        [--exec-prefix]   Kerberos installed exec_prefix"
     echo "        [--cflags]        Compile time CFLAGS"
-    echo "        [--deps]          Include dependent libraries"
     echo "        [--libs]          List libraries required to link [LIBRARIES]"
     echo "Libraries:"
     echo "        krb5              Kerberos 5 application"
@@ -187,7 +186,7 @@ if test -n "$do_libs"; then
 	    -e 's#\$(RPATH_FLAG)#'"$RPATH_FLAG"'#' \
 	    -e 's#\$(LDFLAGS)#'"$LDFLAGS"'#' \
 	    -e 's#\$(PTHREAD_CFLAGS)#'"$PTHREAD_CFLAGS"'#' \
-	    -e 's#\$(CFLAGS)#'"$CFLAGS"'#'`
+	    -e 's#\$(CFLAGS)##'`
 
     if test $library = 'kdb'; then
 	lib_flags="$lib_flags -lkdb5 $KDB5_DB_LIB"
@@ -215,13 +214,12 @@ if test -n "$do_libs"; then
     fi
 
     if test $library = 'krb5'; then
-	if [ "x$do_deps" = "x1" ] ; then
-	    dep_libs="$GEN_LIB $LIBS $DL_LIB"
-	    else
-	    dep_libs=""
-	    fi
-	lib_flags="$lib_flags -lkrb5 -lk5crypto -lcom_err  $dep_libs"
+	lib_flags="$lib_flags -lkrb5 -lk5crypto -lcom_err"
     fi
+
+    # If we ever support a flag to generate output suitable for static
+    # linking, we would output "-lkrb5support $GEN_LIB $LIBS $DL_LIB"
+    # here.
 
     echo $lib_flags
 fi

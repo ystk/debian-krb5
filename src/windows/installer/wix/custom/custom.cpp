@@ -75,7 +75,7 @@ SOFTWARE.
 *         are noted in the comments section of each of the
 *         functions.
 *
-* rcsid: $Id: custom.cpp 20119 2007-10-12 23:08:30Z jaltman $
+* rcsid: $Id: custom.cpp 25585 2011-12-14 00:07:54Z tlyu $
 **************************************************************/
 
 #pragma unmanaged
@@ -87,9 +87,6 @@ SOFTWARE.
 // linker stuff
 #pragma comment(lib, "msi")
 #pragma comment(lib, "advapi32")
-#if defined(_M_IA64) || defined(_M_AMD64)
-#pragma comment(lib, "bufferoverflowu")
-#endif
 
 
 void ShowMsiError( MSIHANDLE hInstall, DWORD errcode, DWORD param ){

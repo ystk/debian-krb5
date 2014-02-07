@@ -1,5 +1,5 @@
 SRCDIR=../src
-DVI=texi2dvi4a2ps	# texi2dvi
+DVI=texi2dvi
 DVIPS=dvips -o "$@"
 PSPDF=ps2pdf
 INFO=makeinfo
@@ -9,7 +9,8 @@ TAR=tar -chvf
 GZIP=gzip -9
 MANPS=./man2ps
 MANTXT=nroff -man 
-MANHTML=./man2html
+PERL=perl
+MANHTML=$(PERL) man2html
 
 ADMIN_INCLUDES=definitions.texinfo copyright.texinfo document-list.texinfo \
 	glossary.texinfo support-enc.texinfo salts.texinfo krb5conf.texinfo \
@@ -33,7 +34,7 @@ all:: admin-guide-full install-guide-full user-guide-full clean-temp-ps clean-te
 admin-guide-full:: admin-guide admin-guide-info admin-guide-html
 
 .PHONY: admin-guide
-admin-guide:: admin-guide.ps
+admin-guide:: admin-guide.ps admin-guide.pdf
 
 admin-guide.ps: $(ADMIN_DEPS)
 	$(DVI) admin.texinfo
@@ -58,7 +59,7 @@ krb5-admin.info: $(ADMIN_DEPS)
 install-guide-full:: install-guide install-guide-info install-guide-html
 
 .PHONY: install-guide
-install-guide:: install-guide.ps
+install-guide:: install-guide.ps install-guide.pdf
 
 install-guide.ps: $(INSTALL_DEPS)
 	$(DVI) install.texinfo
@@ -83,7 +84,7 @@ krb5-install.info: $(INSTALL_DEPS)
 user-guide-full:: user-guide user-guide-info user-guide-html
 
 .PHONY: user-guide
-user-guide:: user-guide.ps
+user-guide:: user-guide.ps user-guide.pdf
 
 user-guide.ps: $(USER_GUIDE_DEPS)
 	$(DVI) user-guide.texinfo
@@ -151,3 +152,6 @@ tgz::
 	$(TAR) krb5-docs.tar admin.texinfo build.texinfo copyright.texinfo definitions.texinfo document-list.texinfo glossary.texinfo install.texinfo texinfo.tex user-guide.texinfo *-guide.ps *.info *.info-? *.html
 	$(GZIP) krb5-docs.tar
 	$(MV) krb5-docs.tar.gz krb5-docs.tgz
+
+../NOTICE: notice.texinfo definitions.texinfo copyright.texinfo
+	makeinfo --plaintext -o $@ notice.texinfo

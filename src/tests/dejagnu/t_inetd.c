@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* tests/dejagnu/t_inetd.c */
 /*
- * tests/dejagnu/t_inetd.c
- *
  * Copyright 1991 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,15 +22,15 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
+ */
+
+/*
  * A simple program to simulate starting a process from inetd.
  *
  * Unlike a proper inetd situation, environment variables are passed
  * to the client.
  *
  * usage: t_inetd port program argv0 ...
- *
  */
 
 #include "autoconf.h"
@@ -46,6 +45,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <stdio.h>
+#include <string.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <signal.h>
@@ -97,6 +97,7 @@ main(argc, argv)
     (void) setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&one,
                       sizeof (one));
 
+    memset(&l_inaddr, 0, sizeof(l_inaddr));
     l_inaddr.sin_family = AF_INET;
     l_inaddr.sin_addr.s_addr = 0;
     l_inaddr.sin_port = port;
@@ -112,6 +113,7 @@ main(argc, argv)
     }
 
     printf("Ready!\n");
+    fflush(stdout);
     if ((acc = accept(sock, (struct sockaddr *)&f_inaddr,
                       &namelen)) == -1) {
         com_err(progname, errno, "accepting");

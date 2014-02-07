@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/krb/pac.c */
 /*
- * lib/krb5/krb/pac.c
- *
  * Copyright 2008 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,67 +22,17 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
  */
 
 #include "k5-int.h"
-#include "k5-utf8.h"
 #include "authdata.h"
 
 /* draft-brezak-win2k-krb-authz-00 */
 
 /*
- * A PAC consists of a sequence of PAC_INFO_BUFFERs, preceeded by
- * a PACTYPE header. Decoding the contents of the buffers is left
- * to the application (notwithstanding signature verification).
- */
-
-typedef struct _PAC_INFO_BUFFER {
-    krb5_ui_4 ulType;
-    krb5_ui_4 cbBufferSize;
-    krb5_ui_8 Offset;
-} PAC_INFO_BUFFER;
-
-#define PAC_INFO_BUFFER_LENGTH  16
-
-/* ulType */
-#define PAC_LOGON_INFO          1
-#define PAC_CREDENTIALS_INFO    2
-#define PAC_SERVER_CHECKSUM     6
-#define PAC_PRIVSVR_CHECKSUM    7
-#define PAC_CLIENT_INFO         10
-#define PAC_DELEGATION_INFO     11
-#define PAC_UPN_DNS_INFO        12
-
-typedef struct _PACTYPE {
-    krb5_ui_4 cBuffers;
-    krb5_ui_4 Version;
-    PAC_INFO_BUFFER Buffers[1];
-} PACTYPE;
-
-#define PAC_ALIGNMENT               8
-#define PACTYPE_LENGTH              8U
-#define PAC_SIGNATURE_DATA_LENGTH   4U
-#define PAC_CLIENT_INFO_LENGTH      10U
-
-#define NT_TIME_EPOCH               11644473600LL
-
-struct krb5_pac_data {
-    PACTYPE *pac;       /* PAC header + info buffer array */
-    krb5_data data;     /* PAC data (including uninitialised header) */
-    krb5_boolean verified;
-};
-
-static krb5_error_code
-k5_pac_locate_buffer(krb5_context context,
-                     const krb5_pac pac,
-                     krb5_ui_4 type,
-                     krb5_data *data);
-
-/*
  * Add a buffer to the provided PAC and update header.
  */
-static krb5_error_code
+krb5_error_code
 k5_pac_add_buffer(krb5_context context,
                   krb5_pac pac,
                   krb5_ui_4 type,
@@ -187,7 +136,7 @@ krb5_pac_free(krb5_context context,
     }
 }
 
-static krb5_error_code
+krb5_error_code
 k5_pac_locate_buffer(krb5_context context,
                      const krb5_pac pac,
                      krb5_ui_4 type,
@@ -447,7 +396,7 @@ k5_time_to_seconds_since_1970(krb5_int64 ntTime,
     return 0;
 }
 
-static krb5_error_code
+krb5_error_code
 k5_seconds_since_1970_to_time(krb5_timestamp elapsedSeconds,
                               krb5_ui_8 *ntTime)
 {
@@ -461,7 +410,7 @@ k5_seconds_since_1970_to_time(krb5_timestamp elapsedSeconds,
     return 0;
 }
 
-static krb5_error_code
+krb5_error_code
 k5_pac_validate_client(krb5_context context,
                        const krb5_pac pac,
                        krb5_timestamp authtime,
@@ -476,7 +425,8 @@ k5_pac_validate_client(krb5_context context,
     krb5_int64 pac_nt_authtime;
     krb5_principal pac_principal;
 
-    ret = k5_pac_locate_buffer(context, pac, PAC_CLIENT_INFO, &client_info);
+    ret = k5_pac_locate_buffer(context, pac, KRB5_PAC_CLIENT_INFO,
+                               &client_info);
     if (ret != 0)
         return ret;
 
@@ -502,7 +452,8 @@ k5_pac_validate_client(krb5_context context,
     if (ret != 0)
         return ret;
 
-    ret = krb5_parse_name_flags(context, pac_princname, 0, &pac_principal);
+    ret = krb5_parse_name_flags(context, pac_princname,
+                                KRB5_PRINCIPAL_PARSE_NO_REALM, &pac_principal);
     if (ret != 0) {
         free(pac_princname);
         return ret;
@@ -531,7 +482,8 @@ k5_pac_zero_signature(krb5_context context,
     PAC_INFO_BUFFER *buffer = NULL;
     size_t i;
 
-    assert(type == PAC_SERVER_CHECKSUM || type == PAC_PRIVSVR_CHECKSUM);
+    assert(type == KRB5_PAC_SERVER_CHECKSUM ||
+           type == KRB5_PAC_PRIVSVR_CHECKSUM);
     assert(data->length >= pac->data.length);
 
     for (i = 0; i < pac->pac->cBuffers; i++) {
@@ -570,8 +522,8 @@ k5_pac_verify_server_checksum(krb5_context context,
     krb5_boolean valid;
     krb5_octet *p;
 
-    ret = k5_pac_locate_buffer(context, pac,
-                               PAC_SERVER_CHECKSUM, &checksum_data);
+    ret = k5_pac_locate_buffer(context, pac, KRB5_PAC_SERVER_CHECKSUM,
+                               &checksum_data);
     if (ret != 0)
         return ret;
 
@@ -593,15 +545,15 @@ k5_pac_verify_server_checksum(krb5_context context,
     memcpy(pac_data.data, pac->data.data, pac->data.length);
 
     /* Zero out both checksum buffers */
-    ret = k5_pac_zero_signature(context, pac,
-                                PAC_SERVER_CHECKSUM, &pac_data);
+    ret = k5_pac_zero_signature(context, pac, KRB5_PAC_SERVER_CHECKSUM,
+                                &pac_data);
     if (ret != 0) {
         free(pac_data.data);
         return ret;
     }
 
-    ret = k5_pac_zero_signature(context, pac,
-                                PAC_PRIVSVR_CHECKSUM, &pac_data);
+    ret = k5_pac_zero_signature(context, pac, KRB5_PAC_PRIVSVR_CHECKSUM,
+                                &pac_data);
     if (ret != 0) {
         free(pac_data.data);
         return ret;
@@ -634,16 +586,16 @@ k5_pac_verify_kdc_checksum(krb5_context context,
     krb5_boolean valid;
     krb5_octet *p;
 
-    ret = k5_pac_locate_buffer(context, pac,
-                               PAC_PRIVSVR_CHECKSUM, &privsvr_checksum);
+    ret = k5_pac_locate_buffer(context, pac, KRB5_PAC_PRIVSVR_CHECKSUM,
+                               &privsvr_checksum);
     if (ret != 0)
         return ret;
 
     if (privsvr_checksum.length < PAC_SIGNATURE_DATA_LENGTH)
         return KRB5_BAD_MSIZE;
 
-    ret = k5_pac_locate_buffer(context, pac,
-                               PAC_SERVER_CHECKSUM, &server_checksum);
+    ret = k5_pac_locate_buffer(context, pac, KRB5_PAC_SERVER_CHECKSUM,
+                               &server_checksum);
     if (ret != 0)
         return ret;
 
@@ -654,6 +606,8 @@ k5_pac_verify_kdc_checksum(krb5_context context,
     checksum.checksum_type = load_32_le(p);
     checksum.length = privsvr_checksum.length - PAC_SIGNATURE_DATA_LENGTH;
     checksum.contents = p + PAC_SIGNATURE_DATA_LENGTH;
+    if (!krb5_c_is_keyed_cksum(checksum.checksum_type))
+        return KRB5KRB_AP_ERR_INAPP_CKSUM;
 
     server_checksum.data += PAC_SIGNATURE_DATA_LENGTH;
     server_checksum.length -= PAC_SIGNATURE_DATA_LENGTH;
@@ -684,16 +638,8 @@ krb5_pac_verify(krb5_context context,
         return EINVAL;
 
     ret = k5_pac_verify_server_checksum(context, pac, server);
-    if (ret == ENOENT) {
-        /*
-         * Apple Mac OS X Server Open Directory KDC (at least 10.6)
-         * appears to provide a PAC that lacks a server checksum.
-         */
-        pac->verified = FALSE;
+    if (ret != 0)
         return ret;
-    } else if (ret != 0) {
-        return ret;
-    }
 
     if (privsvr != NULL) {
         ret = k5_pac_verify_kdc_checksum(context, pac, privsvr);
@@ -708,251 +654,6 @@ krb5_pac_verify(krb5_context context,
     }
 
     pac->verified = TRUE;
-
-    return 0;
-}
-
-static krb5_error_code
-k5_insert_client_info(krb5_context context,
-                      krb5_pac pac,
-                      krb5_timestamp authtime,
-                      krb5_const_principal principal)
-{
-    krb5_error_code ret;
-    krb5_data client_info;
-    char *princ_name_utf8 = NULL;
-    unsigned char *princ_name_ucs2 = NULL, *p;
-    size_t princ_name_ucs2_len = 0;
-    krb5_ui_8 nt_authtime;
-
-    /* If we already have a CLIENT_INFO buffer, then just validate it */
-    if (k5_pac_locate_buffer(context, pac,
-                             PAC_CLIENT_INFO, &client_info) == 0) {
-        return k5_pac_validate_client(context, pac, authtime, principal);
-    }
-
-    ret = krb5_unparse_name_flags(context, principal,
-                                  KRB5_PRINCIPAL_UNPARSE_NO_REALM,
-                                  &princ_name_utf8);
-    if (ret != 0)
-        goto cleanup;
-
-    ret = krb5int_utf8s_to_ucs2les(princ_name_utf8,
-                                   &princ_name_ucs2,
-                                   &princ_name_ucs2_len);
-    if (ret != 0)
-        goto cleanup;
-
-    client_info.length = PAC_CLIENT_INFO_LENGTH + princ_name_ucs2_len;
-    client_info.data = NULL;
-
-    ret = k5_pac_add_buffer(context, pac, PAC_CLIENT_INFO,
-                            &client_info, TRUE, &client_info);
-    if (ret != 0)
-        goto cleanup;
-
-    p = (unsigned char *)client_info.data;
-
-    /* copy in authtime converted to a 64-bit NT time */
-    k5_seconds_since_1970_to_time(authtime, &nt_authtime);
-    store_64_le(nt_authtime, p);
-    p += 8;
-
-    /* copy in number of UCS-2 characters in principal name */
-    store_16_le(princ_name_ucs2_len, p);
-    p += 2;
-
-    /* copy in principal name */
-    memcpy(p, princ_name_ucs2, princ_name_ucs2_len);
-
-cleanup:
-    if (princ_name_ucs2 != NULL)
-        free(princ_name_ucs2);
-    krb5_free_unparsed_name(context, princ_name_utf8);
-
-    return ret;
-}
-
-static krb5_error_code
-k5_insert_checksum(krb5_context context,
-                   krb5_pac pac,
-                   krb5_ui_4 type,
-                   const krb5_keyblock *key,
-                   krb5_cksumtype *cksumtype)
-{
-    krb5_error_code ret;
-    size_t len;
-    krb5_data cksumdata;
-
-    ret = krb5int_c_mandatory_cksumtype(context, key->enctype, cksumtype);
-    if (ret != 0)
-        return ret;
-
-    ret = krb5_c_checksum_length(context, *cksumtype, &len);
-    if (ret != 0)
-        return ret;
-
-    ret = k5_pac_locate_buffer(context, pac, type, &cksumdata);
-    if (ret == 0) {
-        /*
-         * If we're resigning PAC, make sure we can fit checksum
-         * into existing buffer
-         */
-        if (cksumdata.length != PAC_SIGNATURE_DATA_LENGTH + len)
-            return ERANGE;
-
-        memset(cksumdata.data, 0, cksumdata.length);
-    } else {
-        /* Add a zero filled buffer */
-        cksumdata.length = PAC_SIGNATURE_DATA_LENGTH + len;
-        cksumdata.data = NULL;
-
-        ret = k5_pac_add_buffer(context, pac,
-                                type, &cksumdata,
-                                TRUE, &cksumdata);
-        if (ret != 0)
-            return ret;
-    }
-
-    /* Encode checksum type into buffer */
-    store_32_le((krb5_ui_4)*cksumtype, cksumdata.data);
-
-    return 0;
-}
-
-/* in-place encoding of PAC header */
-static krb5_error_code
-k5_pac_encode_header(krb5_context context, krb5_pac pac)
-{
-    size_t i;
-    unsigned char *p;
-    size_t header_len;
-
-    header_len = PACTYPE_LENGTH +
-        (pac->pac->cBuffers * PAC_INFO_BUFFER_LENGTH);
-    assert(pac->data.length >= header_len);
-
-    p = (unsigned char *)pac->data.data;
-
-    store_32_le(pac->pac->cBuffers, p);
-    p += 4;
-    store_32_le(pac->pac->Version, p);
-    p += 4;
-
-    for (i = 0; i < pac->pac->cBuffers; i++) {
-        PAC_INFO_BUFFER *buffer = &pac->pac->Buffers[i];
-
-        store_32_le(buffer->ulType, p);
-        p += 4;
-        store_32_le(buffer->cbBufferSize, p);
-        p += 4;
-        store_64_le(buffer->Offset, p);
-        p += 8;
-
-        assert((buffer->Offset % PAC_ALIGNMENT) == 0);
-        assert(buffer->Offset + buffer->cbBufferSize <= pac->data.length);
-        assert(buffer->Offset >= header_len);
-
-        if (buffer->Offset % PAC_ALIGNMENT ||
-            buffer->Offset + buffer->cbBufferSize > pac->data.length ||
-            buffer->Offset < header_len)
-            return ERANGE;
-    }
-
-    return 0;
-}
-
-krb5_error_code KRB5_CALLCONV
-krb5int_pac_sign(krb5_context context,
-                 krb5_pac pac,
-                 krb5_timestamp authtime,
-                 krb5_const_principal principal,
-                 const krb5_keyblock *server_key,
-                 const krb5_keyblock *privsvr_key,
-                 krb5_data *data)
-{
-    krb5_error_code ret;
-    krb5_data server_cksum, privsvr_cksum;
-    krb5_cksumtype server_cksumtype, privsvr_cksumtype;
-    krb5_crypto_iov iov[2];
-
-    data->length = 0;
-    data->data = NULL;
-
-    if (principal != NULL) {
-        ret = k5_insert_client_info(context, pac, authtime, principal);
-        if (ret != 0)
-            return ret;
-    }
-
-    /* Create zeroed buffers for both checksums */
-    ret = k5_insert_checksum(context, pac, PAC_SERVER_CHECKSUM,
-                             server_key, &server_cksumtype);
-    if (ret != 0)
-        return ret;
-
-    ret = k5_insert_checksum(context, pac, PAC_PRIVSVR_CHECKSUM,
-                             privsvr_key, &privsvr_cksumtype);
-    if (ret != 0)
-        return ret;
-
-    /* Now, encode the PAC header so that the checksums will include it */
-    ret = k5_pac_encode_header(context, pac);
-    if (ret != 0)
-        return ret;
-
-    /* Generate the server checksum over the entire PAC */
-    ret = k5_pac_locate_buffer(context, pac,
-                               PAC_SERVER_CHECKSUM, &server_cksum);
-    if (ret != 0)
-        return ret;
-
-    assert(server_cksum.length > PAC_SIGNATURE_DATA_LENGTH);
-
-    iov[0].flags = KRB5_CRYPTO_TYPE_DATA;
-    iov[0].data = pac->data;
-
-    iov[1].flags = KRB5_CRYPTO_TYPE_CHECKSUM;
-    iov[1].data.data = server_cksum.data + PAC_SIGNATURE_DATA_LENGTH;
-    iov[1].data.length = server_cksum.length - PAC_SIGNATURE_DATA_LENGTH;
-
-    ret = krb5_c_make_checksum_iov(context, server_cksumtype,
-                                   server_key, KRB5_KEYUSAGE_APP_DATA_CKSUM,
-                                   iov, sizeof(iov)/sizeof(iov[0]));
-    if (ret != 0)
-        return ret;
-
-    /* Generate the privsvr checksum over the server checksum buffer */
-    ret = k5_pac_locate_buffer(context, pac,
-                               PAC_PRIVSVR_CHECKSUM, &privsvr_cksum);
-    if (ret != 0)
-        return ret;
-
-    assert(privsvr_cksum.length > PAC_SIGNATURE_DATA_LENGTH);
-
-    iov[0].flags = KRB5_CRYPTO_TYPE_DATA;
-    iov[0].data.data = server_cksum.data + PAC_SIGNATURE_DATA_LENGTH;
-    iov[0].data.length = server_cksum.length - PAC_SIGNATURE_DATA_LENGTH;
-
-    iov[1].flags = KRB5_CRYPTO_TYPE_CHECKSUM;
-    iov[1].data.data = privsvr_cksum.data + PAC_SIGNATURE_DATA_LENGTH;
-    iov[1].data.length = privsvr_cksum.length - PAC_SIGNATURE_DATA_LENGTH;
-
-    ret = krb5_c_make_checksum_iov(context, privsvr_cksumtype,
-                                   privsvr_key, KRB5_KEYUSAGE_APP_DATA_CKSUM,
-                                   iov, sizeof(iov)/sizeof(iov[0]));
-    if (ret != 0)
-        return ret;
-
-    data->data = malloc(pac->data.length);
-    if (data->data == NULL)
-        return ENOMEM;
-
-    data->length = pac->data.length;
-
-    memcpy(data->data, pac->data.data, pac->data.length);
-    memset(pac->data.data, 0,
-           PACTYPE_LENGTH + (pac->pac->cBuffers * PAC_INFO_BUFFER_LENGTH));
 
     return 0;
 }
@@ -977,7 +678,7 @@ mspac_flags(krb5_context kcontext,
             krb5_authdatatype ad_type,
             krb5_flags *flags)
 {
-    *flags = AD_USAGE_KDC_ISSUED;
+    *flags = AD_USAGE_TGS_REQ;
 }
 
 static void
@@ -1095,35 +796,20 @@ mspac_verify(krb5_context kcontext,
     if (pacctx->pac == NULL)
         return EINVAL;
 
-    code = krb5_pac_verify(kcontext,
-                           pacctx->pac,
+    code = krb5_pac_verify(kcontext, pacctx->pac,
                            req->ticket->enc_part2->times.authtime,
-                           req->ticket->enc_part2->client,
-                           key,
-                           NULL);
+                           req->ticket->enc_part2->client, key, NULL);
+    if (code != 0)
+        TRACE_MSPAC_VERIFY_FAIL(kcontext, code);
 
     /*
-     * If the server checksum is not found, return success to
-     * krb5int_authdata_verify() to work around an apparent Open
-     * Directory bug.  Non-verified PACs won't be returned by
-     * mspac_get_attribute().
+     * If the above verification failed, don't fail the whole authentication,
+     * just don't mark the PAC as verified.  A checksum mismatch can occur if
+     * the PAC was copied from a cross-realm TGT by an ignorant KDC, and Apple
+     * Mac OS X Server Open Directory (as of 10.6) generates PACs with no
+     * server checksum at all.
      */
-    if (code == ENOENT && !pacctx->pac->verified) {
-        code = 0;
-    }
-
-#if 0
-    /*
-     * Now, we could return 0 and just set pac->verified to FALSE.
-     * Thoughts?
-     */
-    if (code == KRB5KRB_AP_ERR_BAD_INTEGRITY) {
-        assert(pacctx->pac->verified == FALSE);
-        code = 0;
-    }
-#endif
-
-    return code;
+    return 0;
 }
 
 static void
@@ -1148,14 +834,29 @@ static struct {
     krb5_ui_4 type;
     krb5_data attribute;
 } mspac_attribute_types[] = {
-    { (krb5_ui_4)-1,            { KV5M_DATA, STRLENOF("urn:mspac:"), "urn:mspac:" } },
-    { PAC_LOGON_INFO,           { KV5M_DATA, STRLENOF("urn:mspac:logon-info"), "urn:mspac:logon-info" } },
-    { PAC_CREDENTIALS_INFO,     { KV5M_DATA, STRLENOF("urn:mspac:credentials-info"), "urn:mspac:credentials-info" } },
-    { PAC_SERVER_CHECKSUM,      { KV5M_DATA, STRLENOF("urn:mspac:server-checksum"), "urn:mspac:server-checksum" } },
-    { PAC_PRIVSVR_CHECKSUM,     { KV5M_DATA, STRLENOF("urn:mspac:privsvr-checksum"), "urn:mspac:privsvr-checksum" } },
-    { PAC_CLIENT_INFO,          { KV5M_DATA, STRLENOF("urn:mspac:client-info"), "urn:mspac:client-info" } },
-    { PAC_DELEGATION_INFO,      { KV5M_DATA, STRLENOF("urn:mspac:delegation-info"), "urn:mspac:delegation-info" } },
-    { PAC_UPN_DNS_INFO,         { KV5M_DATA, STRLENOF("urn:mspac:upn-dns-info"), "urn:mspac:upn-dns-info" } },
+    { (krb5_ui_4)-1,            { KV5M_DATA, STRLENOF("urn:mspac:"),
+                                  "urn:mspac:" } },
+    { KRB5_PAC_LOGON_INFO,       { KV5M_DATA,
+                                   STRLENOF("urn:mspac:logon-info"),
+                                   "urn:mspac:logon-info" } },
+    { KRB5_PAC_CREDENTIALS_INFO, { KV5M_DATA,
+                                   STRLENOF("urn:mspac:credentials-info"),
+                                   "urn:mspac:credentials-info" } },
+    { KRB5_PAC_SERVER_CHECKSUM,  { KV5M_DATA,
+                                   STRLENOF("urn:mspac:server-checksum"),
+                                   "urn:mspac:server-checksum" } },
+    { KRB5_PAC_PRIVSVR_CHECKSUM, { KV5M_DATA,
+                                   STRLENOF("urn:mspac:privsvr-checksum"),
+                                   "urn:mspac:privsvr-checksum" } },
+    { KRB5_PAC_CLIENT_INFO,      { KV5M_DATA,
+                                   STRLENOF("urn:mspac:client-info"),
+                                   "urn:mspac:client-info" } },
+    { KRB5_PAC_DELEGATION_INFO,  { KV5M_DATA,
+                                   STRLENOF("urn:mspac:delegation-info"),
+                                   "urn:mspac:delegation-info" } },
+    { KRB5_PAC_UPN_DNS_INFO,     { KV5M_DATA,
+                                   STRLENOF("urn:mspac:upn-dns-info"),
+                                   "urn:mspac:upn-dns-info" } },
 };
 
 #define MSPAC_ATTRIBUTE_COUNT   (sizeof(mspac_attribute_types)/sizeof(mspac_attribute_types[0]))
@@ -1289,6 +990,7 @@ mspac_get_attribute(krb5_context kcontext,
 
     /* If it didn't verify, pretend it didn't exist. */
     if (!pacctx->pac->verified) {
+        TRACE_MSPAC_DISCARD_UNVERF(kcontext);
         return ENOENT;
     }
 
@@ -1372,10 +1074,10 @@ mspac_export_internal(krb5_context kcontext,
     *ptr = NULL;
 
     if (pacctx->pac == NULL)
-        return 0;
+        return ENOENT;
 
     if (restrict_authenticated && (pacctx->pac->verified) == FALSE)
-        return 0;
+        return ENOENT;
 
     code = krb5_pac_parse(kcontext, pacctx->pac->data.data,
                           pacctx->pac->data.length, &pac);

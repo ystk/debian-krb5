@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* lib/krb5/krb/copy_athctr.c */
 /*
- * lib/krb5/krb/copy_athctr.c
- *
  * Copyright 1990,1991 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,15 +22,15 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
- *
- * krb5_copy_authenticator()
  */
 
 #include "k5-int.h"
+#include "auth_con.h"
+
 #ifndef LEAN_CLIENT
 krb5_error_code KRB5_CALLCONV
-krb5_copy_authenticator(krb5_context context, const krb5_authenticator *authfrom, krb5_authenticator **authto)
+krb5_copy_authenticator(krb5_context context, const krb5_authenticator *authfrom,
+                        krb5_authenticator **authto)
 {
     krb5_error_code retval;
     krb5_authenticator *tempto;
@@ -56,7 +55,6 @@ krb5_copy_authenticator(krb5_context context, const krb5_authenticator *authfrom
     if (authfrom->subkey) {
         retval = krb5_copy_keyblock(context, authfrom->subkey, &tempto->subkey);
         if (retval) {
-            free(tempto->subkey);
             krb5_free_checksum(context, tempto->checksum);
             krb5_free_principal(context, tempto->client);
             free(tempto);
@@ -68,10 +66,9 @@ krb5_copy_authenticator(krb5_context context, const krb5_authenticator *authfrom
         retval = krb5_copy_authdata(context, authfrom->authorization_data,
                                     &tempto->authorization_data);
         if (retval) {
-            free(tempto->subkey);
+            krb5_free_keyblock(context, tempto->subkey);
             krb5_free_checksum(context, tempto->checksum);
             krb5_free_principal(context, tempto->client);
-            krb5_free_authdata(context, tempto->authorization_data);
             free(tempto);
             return retval;
         }
@@ -79,5 +76,13 @@ krb5_copy_authenticator(krb5_context context, const krb5_authenticator *authfrom
 
     *authto = tempto;
     return 0;
+}
+
+krb5_error_code KRB5_CALLCONV
+krb5_auth_con_getauthenticator(krb5_context context, krb5_auth_context auth_context,
+                               krb5_authenticator **authenticator)
+{
+    return (krb5_copy_authenticator(context, auth_context->authentp,
+                                    authenticator));
 }
 #endif

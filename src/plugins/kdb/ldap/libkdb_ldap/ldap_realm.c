@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* plugins/kdb/ldap/libkdb_ldap/ldap_realm.c */
 /*
- * lib/kdb/kdb_ldap/ldap_realm.c
- *
  * Copyright (c) 2004-2005, Novell, Inc.
  * All rights reserved.
  *
@@ -268,7 +267,8 @@ krb5_ldap_delete_realm (krb5_context context, char *lrealm)
 
     if (lrealm == NULL) {
         st = EINVAL;
-        krb5_set_error_message (context, st, "Realm information not available");
+        krb5_set_error_message(context, st,
+                               _("Realm information not available"));
         goto cleanup;
     }
 
@@ -322,9 +322,8 @@ krb5_ldap_delete_realm (krb5_context context, char *lrealm)
                 for (i = 0; values[i] != NULL; ++i) {
                     krb5_parse_name(context, values[i], &principal);
                     if (principal_in_realm_2(principal, lrealm) == 0) {
-                        int nent = 0;
-                        if ((st=krb5_ldap_delete_principal(context, principal,
-                                                           &nent)) != LDAP_SUCCESS)
+                        st=krb5_ldap_delete_principal(context, principal);
+                        if (st && st != KRB5_KDB_NOENTRY)
                             goto cleanup;
                     }
                     krb5_free_principal(context, principal);
@@ -341,7 +340,8 @@ krb5_ldap_delete_realm (krb5_context context, char *lrealm)
     /* Delete all ticket policies */
     {
         if ((st = krb5_ldap_list_policy (context, ldap_context->lrparams->realmdn, &policy)) != 0) {
-            prepend_err_str (context, "Error reading ticket policy: ", st, st);
+            prepend_err_str(context, _("Error reading ticket policy: "), st,
+                            st);
             goto cleanup;
         }
 
@@ -353,8 +353,8 @@ krb5_ldap_delete_realm (krb5_context context, char *lrealm)
     if ((st=ldap_delete_ext_s(ld, ldap_context->lrparams->realmdn, NULL, NULL)) != LDAP_SUCCESS) {
         int ost = st;
         st = translate_ldap_error (st, OP_DEL);
-        krb5_set_error_message (context, st, "Realm Delete FAILED: %s",
-                                ldap_err2string(ost));
+        krb5_set_error_message(context, st, _("Realm Delete FAILED: %s"),
+                               ldap_err2string(ost));
     }
 
 cleanup:
@@ -443,7 +443,7 @@ krb5_ldap_modify_realm(krb5_context context, krb5_ldap_realm_params *rparams,
             free (voidptr);
         } else {
             st = EINVAL;
-            krb5_set_error_message (context, st, "tl_data not available");
+            krb5_set_error_message(context, st, _("tl_data not available"));
             return st;
         }
     }
@@ -457,7 +457,7 @@ krb5_ldap_modify_realm(krb5_context context, krb5_ldap_realm_params *rparams,
                 if (strlen(rparams->subtree[k]) != 0) {
                     st = checkattributevalue(ld, rparams->subtree[k], "Objectclass", subtreeclass,
                                              &objectmask);
-                    CHECK_CLASS_VALIDITY(st, objectmask, "subtree value: ");
+                    CHECK_CLASS_VALIDITY(st, objectmask, _("subtree value: "));
                 }
             }
             strval = rparams->subtree;
@@ -473,7 +473,8 @@ krb5_ldap_modify_realm(krb5_context context, krb5_ldap_realm_params *rparams,
         if (strlen(rparams->containerref) != 0 ) {
             st = checkattributevalue(ld, rparams->containerref, "Objectclass", subtreeclass,
                                      &objectmask);
-            CHECK_CLASS_VALIDITY(st, objectmask, "container reference value: ");
+            CHECK_CLASS_VALIDITY(st, objectmask,
+                                 _("container reference value: "));
             strvalprc[0] = rparams->containerref;
             strvalprc[1] = NULL;
             if ((st=krb5_add_str_mem_ldap_mod(&mods, "krbPrincContainerRef", LDAP_MOD_REPLACE,
@@ -525,7 +526,8 @@ krb5_ldap_modify_realm(krb5_context context, krb5_ldap_realm_params *rparams,
         for (i=0; rparams->kdcservers[i] != NULL; ++i) {
             st = checkattributevalue(ld, rparams->kdcservers[i], "objectClass", kdcclass,
                                      &objectmask);
-            CHECK_CLASS_VALIDITY(st, objectmask, "kdc service object value: ");
+            CHECK_CLASS_VALIDITY(st, objectmask,
+                                 _("kdc service object value: "));
         }
 
         if ((st=krb5_add_str_mem_ldap_mod(&mods, "krbkdcservers", LDAP_MOD_REPLACE,
@@ -539,7 +541,8 @@ krb5_ldap_modify_realm(krb5_context context, krb5_ldap_realm_params *rparams,
         for (i=0; rparams->adminservers[i] != NULL; ++i) {
             st = checkattributevalue(ld, rparams->adminservers[i], "objectClass", adminclass,
                                      &objectmask);
-            CHECK_CLASS_VALIDITY(st, objectmask, "admin service object value: ");
+            CHECK_CLASS_VALIDITY(st, objectmask,
+                                 _("admin service object value: "));
         }
 
         if ((st=krb5_add_str_mem_ldap_mod(&mods, "krbadmservers", LDAP_MOD_REPLACE,
@@ -553,7 +556,8 @@ krb5_ldap_modify_realm(krb5_context context, krb5_ldap_realm_params *rparams,
         for (i=0; rparams->passwdservers[i] != NULL; ++i) {
             st = checkattributevalue(ld, rparams->passwdservers[i], "objectClass", pwdclass,
                                      &objectmask);
-            CHECK_CLASS_VALIDITY(st, objectmask, "password service object value: ");
+            CHECK_CLASS_VALIDITY(st, objectmask,
+                                 _("password service object value: "));
         }
 
         if ((st=krb5_add_str_mem_ldap_mod(&mods, "krbpwdservers", LDAP_MOD_REPLACE,
@@ -640,9 +644,10 @@ krb5_ldap_modify_realm(krb5_context context, krb5_ldap_realm_params *rparams,
             for (i=0; oldkdcservers[i]; ++i)
                 if ((st=deleteAttribute(ld, oldkdcservers[i], "krbRealmReferences",
                                         rparams->realmdn)) != 0) {
-                    snprintf (errbuf, sizeof(errbuf), "Error removing 'krbRealmReferences' from %s: ",
-                              oldkdcservers[i]);
-                    prepend_err_str (context, errbuf, st, st);
+                    snprintf(errbuf, sizeof(errbuf),
+                             _("Error removing 'krbRealmReferences' from "
+                               "%s: "), oldkdcservers[i]);
+                    prepend_err_str(context, errbuf, st, st);
                     goto cleanup;
                 }
 
@@ -651,9 +656,10 @@ krb5_ldap_modify_realm(krb5_context context, krb5_ldap_realm_params *rparams,
             for (i=0; newkdcservers[i]; ++i)
                 if ((st=updateAttribute(ld, newkdcservers[i], "krbRealmReferences",
                                         rparams->realmdn)) != 0) {
-                    snprintf (errbuf, sizeof(errbuf), "Error adding 'krbRealmReferences' to %s: ",
-                              newkdcservers[i]);
-                    prepend_err_str (context, errbuf, st, st);
+                    snprintf(errbuf, sizeof(errbuf),
+                             _("Error adding 'krbRealmReferences' to %s: "),
+                             newkdcservers[i]);
+                    prepend_err_str(context, errbuf, st, st);
                     goto cleanup;
                 }
 
@@ -677,9 +683,10 @@ krb5_ldap_modify_realm(krb5_context context, krb5_ldap_realm_params *rparams,
             for (i=0; oldadminservers[i]; ++i)
                 if ((st=deleteAttribute(ld, oldadminservers[i], "krbRealmReferences",
                                         rparams->realmdn)) != 0) {
-                    snprintf(errbuf, sizeof(errbuf), "Error removing 'krbRealmReferences' from "
-                             "%s: ", oldadminservers[i]);
-                    prepend_err_str (context, errbuf, st, st);
+                    snprintf(errbuf, sizeof(errbuf),
+                             _("Error removing 'krbRealmReferences' from "
+                               "%s: "), oldadminservers[i]);
+                    prepend_err_str(context, errbuf, st, st);
                     goto cleanup;
                 }
 
@@ -688,9 +695,10 @@ krb5_ldap_modify_realm(krb5_context context, krb5_ldap_realm_params *rparams,
             for (i=0; newadminservers[i]; ++i)
                 if ((st=updateAttribute(ld, newadminservers[i], "krbRealmReferences",
                                         rparams->realmdn)) != 0) {
-                    snprintf(errbuf, sizeof(errbuf), "Error adding 'krbRealmReferences' to %s: ",
+                    snprintf(errbuf, sizeof(errbuf),
+                             _("Error adding 'krbRealmReferences' to %s: "),
                              newadminservers[i]);
-                    prepend_err_str (context, errbuf, st, st);
+                    prepend_err_str(context, errbuf, st, st);
                     goto cleanup;
                 }
         if (newadminservers)
@@ -713,9 +721,10 @@ krb5_ldap_modify_realm(krb5_context context, krb5_ldap_realm_params *rparams,
             for (i=0; oldpasswdservers[i]; ++i)
                 if ((st=deleteAttribute(ld, oldpasswdservers[i], "krbRealmReferences",
                                         rparams->realmdn)) != 0) {
-                    snprintf(errbuf, sizeof(errbuf), "Error removing 'krbRealmReferences' from "
-                             "%s: ", oldpasswdservers[i]);
-                    prepend_err_str (context, errbuf, st, st);
+                    snprintf(errbuf, sizeof(errbuf),
+                             _("Error removing 'krbRealmReferences' from "
+                               "%s: "), oldpasswdservers[i]);
+                    prepend_err_str(context, errbuf, st, st);
                     goto cleanup;
                 }
 
@@ -724,9 +733,10 @@ krb5_ldap_modify_realm(krb5_context context, krb5_ldap_realm_params *rparams,
             for (i=0; newpasswdservers[i]; ++i)
                 if ((st=updateAttribute(ld, newpasswdservers[i], "krbRealmReferences",
                                         rparams->realmdn)) != 0) {
-                    snprintf(errbuf, sizeof(errbuf), "Error adding 'krbRealmReferences' to %s: ",
+                    snprintf(errbuf, sizeof(errbuf),
+                             _("Error adding 'krbRealmReferences' to %s: "),
                              newpasswdservers[i]);
-                    prepend_err_str (context, errbuf, st, st);
+                    prepend_err_str(context, errbuf, st, st);
                     goto cleanup;
                 }
         if (newpasswdservers)
@@ -797,7 +807,8 @@ krb5_ldap_create_krbcontainer(krb5_context context,
         kerberoscontdn = KERBEROS_CONTAINER;
 #else
         st = EINVAL;
-        krb5_set_error_message (context, st, "Kerberos Container information is missing");
+        krb5_set_error_message(context, st,
+                               _("Kerberos Container information is missing"));
         goto cleanup;
 #endif
     }
@@ -810,7 +821,8 @@ krb5_ldap_create_krbcontainer(krb5_context context,
     rdns = ldap_explode_dn(kerberoscontdn, 1);
     if (rdns == NULL) {
         st = EINVAL;
-        krb5_set_error_message(context, st, "Invalid Kerberos container DN");
+        krb5_set_error_message(context, st,
+                               _("Invalid Kerberos container DN"));
         goto cleanup;
     }
 
@@ -823,7 +835,7 @@ krb5_ldap_create_krbcontainer(krb5_context context,
     if (krbcontparams && krbcontparams->policyreference) {
         st = checkattributevalue(ld, krbcontparams->policyreference, "objectclass", policyclass,
                                  &pmask);
-        CHECK_CLASS_VALIDITY(st, pmask, "ticket policy object value: ");
+        CHECK_CLASS_VALIDITY(st, pmask, _("ticket policy object value: "));
 
         strval[0] = krbcontparams->policyreference;
         strval[1] = NULL;
@@ -836,7 +848,9 @@ krb5_ldap_create_krbcontainer(krb5_context context,
     if ((st = ldap_add_ext_s(ld, kerberoscontdn, mods, NULL, NULL)) != LDAP_SUCCESS) {
         int ost = st;
         st = translate_ldap_error (st, OP_ADD);
-        krb5_set_error_message (context, st, "Kerberos Container create FAILED: %s", ldap_err2string(ost));
+        krb5_set_error_message(context, st,
+                               _("Kerberos Container create FAILED: %s"),
+                               ldap_err2string(ost));
         goto cleanup;
     }
 
@@ -849,7 +863,8 @@ krb5_ldap_create_krbcontainer(krb5_context context,
     /* check whether the security container is bound to krbcontainerrefaux object class */
     if ((st=checkattributevalue(ld, SECURITY_CONTAINER, "objectClass",
                                 krbContainerRefclass, &crmask)) != 0) {
-        prepend_err_str (context, "Security Container read FAILED: ", st, st);
+        prepend_err_str(context, _("Security Container read FAILED: "), st,
+                        st);
         /* delete Kerberos Container, status ignored intentionally */
         ldap_delete_ext_s(ld, kerberoscontdn, NULL, NULL);
         goto cleanup;
@@ -871,7 +886,9 @@ krb5_ldap_create_krbcontainer(krb5_context context,
     if ((st=ldap_modify_ext_s(ld, SECURITY_CONTAINER, mods, NULL, NULL)) != LDAP_SUCCESS) {
         int ost = st;
         st = translate_ldap_error (st, OP_MOD);
-        krb5_set_error_message (context, st, "Security Container update FAILED: %s", ldap_err2string(ost));
+        krb5_set_error_message(context, st,
+                               _("Security Container update FAILED: %s"),
+                               ldap_err2string(ost));
         /* delete Kerberos Container, status ignored intentionally */
         ldap_delete_ext_s(ld, kerberoscontdn, NULL, NULL);
         goto cleanup;
@@ -917,7 +934,8 @@ krb5_ldap_delete_krbcontainer(krb5_context context,
         kerberoscontdn = KERBEROS_CONTAINER;
 #else
         st = EINVAL;
-        krb5_set_error_message (context, st, "Kerberos Container information is missing");
+        krb5_set_error_message(context, st,
+                               _("Kerberos Container information is missing"));
         goto cleanup;
 #endif
     }
@@ -926,7 +944,9 @@ krb5_ldap_delete_krbcontainer(krb5_context context,
     if ((st = ldap_delete_ext_s(ld, kerberoscontdn, NULL, NULL)) != LDAP_SUCCESS) {
         int ost = st;
         st = translate_ldap_error (st, OP_ADD);
-        krb5_set_error_message (context, st, "Kerberos Container delete FAILED: %s", ldap_err2string(ost));
+        krb5_set_error_message(context, st,
+                               _("Kerberos Container delete FAILED: %s"),
+                               ldap_err2string(ost));
         goto cleanup;
     }
 
@@ -1017,7 +1037,8 @@ krb5_ldap_create_realm(krb5_context context, krb5_ldap_realm_params *rparams,
                 if (strlen(rparams->subtree[i]) != 0) {
                     st = checkattributevalue(ld, rparams->subtree[i], "Objectclass", subtreeclass,
                                              &objectmask);
-                    CHECK_CLASS_VALIDITY(st, objectmask, "realm object value: ");
+                    CHECK_CLASS_VALIDITY(st, objectmask,
+                                         _("realm object value: "));
                 }
             }
             if ((st=krb5_add_str_mem_ldap_mod(&mods, "krbsubtrees", LDAP_MOD_ADD,
@@ -1083,7 +1104,8 @@ krb5_ldap_create_realm(krb5_context context, krb5_ldap_realm_params *rparams,
         for (i=0; rparams->kdcservers[i] != NULL; ++i) {
             st = checkattributevalue(ld, rparams->kdcservers[i], "objectClass", kdcclass,
                                      &objectmask);
-            CHECK_CLASS_VALIDITY(st, objectmask, "kdc service object value: ");
+            CHECK_CLASS_VALIDITY(st, objectmask,
+                                 _("kdc service object value: "));
 
         }
 
@@ -1098,7 +1120,8 @@ krb5_ldap_create_realm(krb5_context context, krb5_ldap_realm_params *rparams,
         for (i=0; rparams->adminservers[i] != NULL; ++i) {
             st = checkattributevalue(ld, rparams->adminservers[i], "objectClass", adminclass,
                                      &objectmask);
-            CHECK_CLASS_VALIDITY(st, objectmask, "admin service object value: ");
+            CHECK_CLASS_VALIDITY(st, objectmask,
+                                 _("admin service object value: "));
 
         }
 
@@ -1133,7 +1156,8 @@ krb5_ldap_create_realm(krb5_context context, krb5_ldap_realm_params *rparams,
     if (mask & LDAP_REALM_KDCSERVERS)
         for (i=0; rparams->kdcservers[i]; ++i)
             if ((st=updateAttribute(ld, rparams->kdcservers[i], "krbRealmReferences", dn)) != 0) {
-                snprintf(errbuf, sizeof(errbuf), "Error adding 'krbRealmReferences' to %s: ",
+                snprintf(errbuf, sizeof(errbuf),
+                         _("Error adding 'krbRealmReferences' to %s: "),
                          rparams->kdcservers[i]);
                 prepend_err_str (context, errbuf, st, st);
                 /* delete Realm, status ignored intentionally */
@@ -1144,7 +1168,8 @@ krb5_ldap_create_realm(krb5_context context, krb5_ldap_realm_params *rparams,
     if (mask & LDAP_REALM_ADMINSERVERS)
         for (i=0; rparams->adminservers[i]; ++i)
             if ((st=updateAttribute(ld, rparams->adminservers[i], "krbRealmReferences", dn)) != 0) {
-                snprintf(errbuf, sizeof(errbuf), "Error adding 'krbRealmReferences' to %s: ",
+                snprintf(errbuf, sizeof(errbuf),
+                         _("Error adding 'krbRealmReferences' to %s: "),
                          rparams->adminservers[i]);
                 prepend_err_str (context, errbuf, st, st);
                 /* delete Realm, status ignored intentionally */
@@ -1155,7 +1180,8 @@ krb5_ldap_create_realm(krb5_context context, krb5_ldap_realm_params *rparams,
     if (mask & LDAP_REALM_PASSWDSERVERS)
         for (i=0; rparams->passwdservers[i]; ++i)
             if ((st=updateAttribute(ld, rparams->passwdservers[i], "krbRealmReferences", dn)) != 0) {
-                snprintf(errbuf, sizeof(errbuf), "Error adding 'krbRealmReferences' to %s: ",
+                snprintf(errbuf, sizeof(errbuf),
+                         _("Error adding 'krbRealmReferences' to %s: "),
                          rparams->passwdservers[i]);
                 prepend_err_str (context, errbuf, st, st);
                 /* delete Realm, status ignored intentionally */
@@ -1365,7 +1391,9 @@ krb5_ldap_read_realm_params(krb5_context context, char *lrealm,
         if (st != LDAP_SUCCESS && st != LDAP_NO_SUCH_OBJECT) {
             int ost = st;
             st = translate_ldap_error (st, OP_SEARCH);
-            krb5_set_error_message (context, st, "Policy object read failed: %s", ldap_err2string(ost));
+            krb5_set_error_message(context, st,
+                                   _("Policy object read failed: %s"),
+                                   ldap_err2string(ost));
             goto cleanup;
         }
         ent = ldap_first_entry (ld, result);
@@ -1456,11 +1484,6 @@ krb5_ldap_free_realm_params(krb5_ldap_realm_params *rparams)
             if (rparams->tl_data->tl_data_contents)
                 krb5_xfree(rparams->tl_data->tl_data_contents);
             krb5_xfree(rparams->tl_data);
-        }
-
-        if (rparams->mkey.contents) {
-            memset(rparams->mkey.contents, 0, rparams->mkey.length);
-            krb5_xfree(rparams->mkey.contents);
         }
 
         krb5_xfree(rparams);

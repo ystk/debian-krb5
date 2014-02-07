@@ -20,6 +20,9 @@
 /* Define if __attribute__((constructor)) works */
 #undef CONSTRUCTOR_ATTR_WORKS
 
+/* Define if crypto implementation is NSS */
+#undef CRYPTO_IMPL_NSS
+
 /* Define if library initialization should be delayed until first use */
 #undef DELAY_INITIALIZER
 
@@ -33,11 +36,17 @@
    should be enabled. */
 #undef ENABLE_LDAP
 
+/* Define if translation functions should be used. */
+#undef ENABLE_NLS
+
 /* Define if thread support enabled */
 #undef ENABLE_THREADS
 
 /* Define as return type of endrpcent */
 #undef ENDRPCENT_TYPE
+
+/* Define if Fortuna PRNG is selected */
+#undef FORTUNA
 
 /* Define to the type of elements in the array set by `getgroups'. Usually
    this is either `int' or `gid_t'. */
@@ -115,6 +124,9 @@
 /* Define to 1 if you have the `compile' function. */
 #undef HAVE_COMPILE
 
+/* Define if com_err has compatible gettext support */
+#undef HAVE_COM_ERR_INTL
+
 /* Define to 1 if you have the `daemon' function. */
 #undef HAVE_DAEMON
 
@@ -146,6 +158,12 @@
 /* Define to 1 if you have the `flock' function. */
 #undef HAVE_FLOCK
 
+/* Define to 1 if you have the `fnmatch' function. */
+#undef HAVE_FNMATCH
+
+/* Define to 1 if you have the <fnmatch.h> header file. */
+#undef HAVE_FNMATCH_H
+
 /* Define if you have the getaddrinfo function */
 #undef HAVE_GETADDRINFO
 
@@ -173,6 +191,9 @@
 /* Define if getservbyname_r exists and its return type is known */
 #undef HAVE_GETSERVBYNAME_R
 
+/* Have the gettimeofday function */
+#undef HAVE_GETTIMEOFDAY
+
 /* Define to 1 if you have the `getusershell' function. */
 #undef HAVE_GETUSERSHELL
 
@@ -181,12 +202,6 @@
 
 /* Define to 1 if you have the <ifaddrs.h> header file. */
 #undef HAVE_IFADDRS_H
-
-/* Define to 1 if you have the `inet_aton' function. */
-#undef HAVE_INET_ATON
-
-/* Define to 1 if you have the `inet_ntoa' function. */
-#undef HAVE_INET_NTOA
 
 /* Define to 1 if you have the `inet_ntop' function. */
 #undef HAVE_INET_NTOP
@@ -208,6 +223,9 @@
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
+
+/* Define to 1 if you have the `isblank' function. */
+#undef HAVE_ISBLANK
 
 /* Define to 1 if you have the <keyutils.h> header file. */
 #undef HAVE_KEYUTILS_H
@@ -236,6 +254,9 @@
 /* Define to 1 if you have the `crypto' library (-lcrypto). */
 #undef HAVE_LIBCRYPTO
 
+/* Define if building with libedit. */
+#undef HAVE_LIBEDIT
+
 /* Define to 1 if you have the `nsl' library (-lnsl). */
 #undef HAVE_LIBNSL
 
@@ -257,17 +278,11 @@
 /* Define to 1 if the system has the type `long long'. */
 #undef HAVE_LONG_LONG
 
-/* Define to 1 if you have the `lstat' function. */
-#undef HAVE_LSTAT
-
 /* Define to 1 if you have the <machine/byte_order.h> header file. */
 #undef HAVE_MACHINE_BYTE_ORDER_H
 
 /* Define to 1 if you have the <machine/endian.h> header file. */
 #undef HAVE_MACHINE_ENDIAN_H
-
-/* Define to 1 if you have the `memmove' function. */
-#undef HAVE_MEMMOVE
 
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
@@ -299,14 +314,14 @@
 /* Define to 1 if you have the <paths.h> header file. */
 #undef HAVE_PATHS_H
 
+/* Define to 1 if you have the <poll.h> header file. */
+#undef HAVE_POLL_H
+
 /* Define if #pragma weak references work */
 #undef HAVE_PRAGMA_WEAK_REF
 
 /* Define if you have POSIX threads libraries and header files. */
 #undef HAVE_PTHREAD
-
-/* Define to 1 if you have the <pthread.h> header file. */
-#undef HAVE_PTHREAD_H
 
 /* Define to 1 if you have the `pthread_once' function. */
 #undef HAVE_PTHREAD_ONCE
@@ -328,6 +343,9 @@
 
 /* Define to 1 if you have the <Python.h> header file. */
 #undef HAVE_PYTHON_H
+
+/* Define if building with GNU Readline. */
+#undef HAVE_READLINE
 
 /* Define if regcomp exists and functions */
 #undef HAVE_REGCOMP
@@ -364,9 +382,6 @@
 
 /* Define if struct sockaddr contains sa_len */
 #undef HAVE_SA_LEN
-
-/* Define to 1 if you have the <semaphore.h> header file. */
-#undef HAVE_SEMAPHORE_H
 
 /* Define to 1 if you have the `setegid' function. */
 #undef HAVE_SETEGID
@@ -415,9 +430,6 @@
 
 /* Define to 1 if you have the `stat' function. */
 #undef HAVE_STAT
-
-/* Define if stdarg available and compiles */
-#undef HAVE_STDARG_H
 
 /* Define to 1 if you have the <stddef.h> header file. */
 #undef HAVE_STDDEF_H
@@ -476,22 +488,22 @@
 /* Define to 1 if the system has the type `struct rt_msghdr'. */
 #undef HAVE_STRUCT_RT_MSGHDR
 
-/* Define to 1 if `sin_len' is member of `struct sockaddr_in'. */
+/* Define to 1 if `sin_len' is a member of `struct sockaddr_in'. */
 #undef HAVE_STRUCT_SOCKADDR_IN_SIN_LEN
 
-/* Define to 1 if `sa_len' is member of `struct sockaddr'. */
+/* Define to 1 if `sa_len' is a member of `struct sockaddr'. */
 #undef HAVE_STRUCT_SOCKADDR_SA_LEN
 
 /* Define to 1 if the system has the type `struct sockaddr_storage'. */
 #undef HAVE_STRUCT_SOCKADDR_STORAGE
 
-/* Define to 1 if `st_mtimensec' is member of `struct stat'. */
+/* Define to 1 if `st_mtimensec' is a member of `struct stat'. */
 #undef HAVE_STRUCT_STAT_ST_MTIMENSEC
 
-/* Define to 1 if `st_mtimespec.tv_nsec' is member of `struct stat'. */
+/* Define to 1 if `st_mtimespec.tv_nsec' is a member of `struct stat'. */
 #undef HAVE_STRUCT_STAT_ST_MTIMESPEC_TV_NSEC
 
-/* Define to 1 if `st_mtim.tv_nsec' is member of `struct stat'. */
+/* Define to 1 if `st_mtim.tv_nsec' is a member of `struct stat'. */
 #undef HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC
 
 /* Define to 1 if you have the `syslog' function. */
@@ -550,6 +562,9 @@
 /* Define if tcl/tcl.h found */
 #undef HAVE_TCL_TCL_H
 
+/* Define to 1 if you have the `timegm' function. */
+#undef HAVE_TIMEGM
+
 /* Define to 1 if you have the <time.h> header file. */
 #undef HAVE_TIME_H
 
@@ -592,9 +607,6 @@
 /* Define to 1 if the system has the type `u_long'. */
 #undef HAVE_U_LONG
 
-/* Define if varargs available and compiles */
-#undef HAVE_VARARGS_H
-
 /* Define to 1 if you have the `vasprintf' function. */
 #undef HAVE_VASPRINTF
 
@@ -609,6 +621,9 @@
 
 /* May need to be defined to enable IPv6 support, for example on IRIX */
 #undef INET6
+
+/* Define if using bundled libverto */
+#undef INTERNAL_VERTO
 
 /* Define if MIT Project Athena default configuration should be used */
 #undef KRB5_ATHENA_COMPAT
@@ -653,7 +668,7 @@
 /* define if the system header files are missing prototype for vasprintf() */
 #undef NEED_VASPRINTF_PROTO
 
-/* Define if the KDC should use no replay cache */
+/* Define if the KDC should use no lookaside cache */
 #undef NOCACHE
 
 /* Define if references to pthread routines should be non-weak. */
@@ -674,8 +689,14 @@
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
 
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
+
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
+
+/* Define if pkinit crypto implementation is NSS */
+#undef PKINIT_CRYPTO_IMPL_NSS
 
 /* Define if setjmp indicates POSIX interface */
 #undef POSIX_SETJMP
@@ -726,9 +747,6 @@
 /* Define if link-time options for library initialization will be used */
 #undef USE_LINKER_INIT_OPTION
 
-/* Define if the KDC should use a replay cache */
-#undef USE_RCACHE
-
 /* Define if sigprocmask should be used */
 #undef USE_SIGPROCMASK
 
@@ -757,7 +775,7 @@
 /* Define to `int' if <sys/types.h> does not define. */
 #undef mode_t
 
-/* Define to `long' if <sys/types.h> does not define. */
+/* Define to `long int' if <sys/types.h> does not define. */
 #undef off_t
 
 /* Define to `long' if <sys/types.h> does not define. */

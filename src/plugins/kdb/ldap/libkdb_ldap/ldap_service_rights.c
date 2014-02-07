@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* plugins/kdb/ldap/libkdb_ldap/ldap_service_rights.c */
 /*
- * lib/kdb/kdb_ldap/ldap_service_rights.c
- *
  * Copyright (c) 2004-2005, Novell, Inc.
  * All rights reserved.
  *
@@ -54,6 +53,7 @@ static char *kdcrights_subtree[][2] = {
     {"2#subtree#","#krbMaxPwdLife"},
     {"2#subtree#","#krbObjectReferences"},
     {"2#subtree#","#krbLastPwdChange"},
+    {"2#subtree#","#krbLastAdminUnlock"},
     {"6#subtree#","#krbExtraData"},
     {"2#subtree#","#krbPasswordExpiration"},
     {"6#subtree#","#krbLastFailedAuth"},
@@ -82,6 +82,7 @@ static char *adminrights_subtree[][2]={
     {"6#subtree#","#krbPwdMinLength"},
     {"6#subtree#","#krbPwdPolicyReference"},
     {"6#subtree#","#krbLastPwdChange"},
+    {"6#subtree#","#krbLastAdminUnlock"},
     {"6#subtree#","#krbObjectReferences"},
     {"6#subtree#","#krbExtraData"},
     {"6#subtree#","#krbPasswordExpiration"},
@@ -114,6 +115,7 @@ static char *pwdrights_subtree[][2] = {
     {"2#subtree#","#krbPwdMinLength"},
     {"2#subtree#","#krbPwdPolicyReference"},
     {"6#subtree#","#krbLastPwdChange"},
+    {"6#subtree#","#krbLastAdminUnlock"},
     {"2#subtree#","#krbObjectReferences"},
     {"6#subtree#","#krbExtraData"},
     {"6#subtree#","#krbPasswordExpiration"},
@@ -150,6 +152,7 @@ static char *kdcrights_realmcontainer[][2]={
     {"2#subtree#","#krbMaxPwdLife"},
     {"2#subtree#","#krbObjectReferences"},
     {"2#subtree#","#krbLastPwdChange"},
+    {"2#subtree#","#krbLastAdminUnlock"},
     {"6#subtree#","#krbExtraData"},
     {"2#subtree#","#krbPasswordExpiration"},
     {"2#subtree#","#krbDefaultEncSaltTypes"},
@@ -187,6 +190,7 @@ static char *adminrights_realmcontainer[][2]={
     {"6#subtree#","#krbPwdMinLength"},
     {"6#subtree#","#krbPwdPolicyReference"},
     {"6#subtree#","#krbLastPwdChange"},
+    {"6#subtree#","#krbLastAdminUnlock"},
     {"6#subtree#","#krbObjectReferences"},
     {"6#subtree#","#krbExtraData"},
     {"6#subtree#","#krbPasswordExpiration"},
@@ -228,6 +232,7 @@ static char *pwdrights_realmcontainer[][2]={
     {"2#subtree#","#krbPwdMinLength"},
     {"2#subtree#","#krbPwdPolicyReference"},
     {"2#subtree#","#krbLastPwdChange"},
+    {"2#subtree#","#krbLastAdminUnlock"},
     {"2#subtree#","#krbObjectReferences"},
     {"6#subtree#","#krbExtraData"},
     {"6#subtree#","#krbPasswordExpiration"},

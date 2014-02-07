@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* include/adm.h */
 /*
- * include/krb5/adm.h
- *
  * Copyright 1995,2001,2009 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
@@ -23,8 +22,8 @@
  * M.I.T. makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- *
  */
+
 #ifndef KRB5_ADM_H__
 #define KRB5_ADM_H__
 
@@ -195,7 +194,6 @@
  */
 typedef struct __krb5_realm_params {
     char *              realm_profile;
-    char *              realm_dbname;
     char *              realm_mkey_name;
     char *              realm_stash_file;
     char *              realm_kdc_ports;
@@ -211,6 +209,7 @@ typedef struct __krb5_realm_params {
     krb5_flags          realm_flags;
     krb5_key_salt_tuple *realm_keysalts;
     unsigned int        realm_reject_bad_transit:1;
+    unsigned int        realm_restrict_anon:1;
     unsigned int        realm_kadmind_port_valid:1;
     unsigned int        realm_enctype_valid:1;
     unsigned int        realm_max_life_valid:1;
@@ -218,6 +217,7 @@ typedef struct __krb5_realm_params {
     unsigned int        realm_expiration_valid:1;
     unsigned int        realm_flags_valid:1;
     unsigned int        realm_reject_bad_transit_valid:1;
+    unsigned int        realm_restrict_anon_valid:1;
     krb5_int32          realm_num_keysalts;
 } krb5_realm_params;
 #endif  /* KRB5_ADM_H__ */

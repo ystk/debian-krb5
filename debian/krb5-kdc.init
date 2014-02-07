@@ -23,6 +23,7 @@ DESC="Kerberos KDC"
 NAME=krb5kdc
 DAEMON=/usr/sbin/$NAME
 DAEMON_ARGS=""
+PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/krb5-kdc
 
 # Exit if the package is not installed.
@@ -44,10 +45,10 @@ SCRIPTNAME=/etc/init.d/krb5-kdc
 #   2 if daemon could not be started
 do_start_kdc()
 {
-    start-stop-daemon --start --quiet --startas $DAEMON --name $NAME --test \
+    start-stop-daemon --start --quiet --pidfile $PIDFILE --startas $DAEMON --name $NAME --test \
         > /dev/null || return 1
-    start-stop-daemon --start --quiet --startas $DAEMON --name $NAME \
-        -- $DAEMON_ARGS || return 2
+    start-stop-daemon --start --quiet --pidfile $PIDFILE --startas $DAEMON --name $NAME \
+        -- -P $PIDFILE $DAEMON_ARGS || return 2
 }
 
 
@@ -58,7 +59,11 @@ do_start_kdc()
 #   other if a failure occurred
 do_stop_kdc()
 {
-    start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --name $NAME
+    start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE --name $NAME
+    RETVAL="$?"
+    [ "$RETVAL" = 2 ] && return 2
+    rm -f $PIDFILE
+    return "$RETVAL"
 }
 
 
@@ -110,8 +115,12 @@ case "$1" in
     esac
     ;;
 
+  status)
+    status_of_proc -p $PIDFILE "$DAEMON" "$NAME" && exit 0 || exit $?
+    ;;
+
   *)
-    echo "Usage: $SCRIPTNAME {start|stop|restart|force-reload}" >&2
+    echo "Usage: $SCRIPTNAME {start|stop|restart|force-reload|status}" >&2
     exit 3
     ;;
 esac

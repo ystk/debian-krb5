@@ -1,7 +1,6 @@
 /* -*- mode: c; c-basic-offset: 4; indent-tabs-mode: nil -*- */
+/* plugins/kdb/ldap/libkdb_ldap/kdb_ldap.h */
 /*
- * lib/kdb/kdb_ldap/kdb_ldap.h
- *
  * Copyright (c) 2004-2005, Novell, Inc.
  * All rights reserved.
  *
@@ -102,14 +101,18 @@ extern void prepend_err_str (krb5_context ctx, const char *s, krb5_error_code er
 #define LDAP_SEARCH(base, scope, filter, attrs)   LDAP_SEARCH_1(base, scope, filter, attrs, CHECK_STATUS)
 
 #define LDAP_SEARCH_1(base, scope, filter, attrs, status_check)         \
-    do {                                                                \
-        st = ldap_search_ext_s(ld, base, scope, filter, attrs, 0, NULL, NULL, &timelimit, LDAP_NO_LIMIT, &result); \
-        if (translate_ldap_error(st, OP_SEARCH) == KRB5_KDB_ACCESS_ERROR) { \
-            tempst = krb5_ldap_rebind(ldap_context, &ldap_server_handle); \
-            if (ldap_server_handle)                                     \
-                ld = ldap_server_handle->ldap_handle;                   \
-        }                                                               \
-    }while (translate_ldap_error(st, OP_SEARCH) == KRB5_KDB_ACCESS_ERROR && tempst == 0); \
+    tempst = 0;                                                         \
+    st = ldap_search_ext_s(ld, base, scope, filter, attrs, 0, NULL,     \
+                           NULL, &timelimit, LDAP_NO_LIMIT, &result);   \
+    if (translate_ldap_error(st, OP_SEARCH) == KRB5_KDB_ACCESS_ERROR) { \
+        tempst = krb5_ldap_rebind(ldap_context, &ldap_server_handle);   \
+        if (ldap_server_handle)                                         \
+            ld = ldap_server_handle->ldap_handle;                       \
+        if (tempst == 0)                                                \
+            st = ldap_search_ext_s(ld, base, scope, filter, attrs, 0,   \
+                                   NULL, NULL, &timelimit,              \
+                                   LDAP_NO_LIMIT, &result);             \
+    }                                                                   \
                                                                         \
     if (status_check != IGNORE_STATUS) {                                \
         if (tempst != 0) {                                              \
@@ -142,10 +145,6 @@ extern void prepend_err_str (krb5_context ctx, const char *s, krb5_error_code er
 #define  STORE32_INT(ptr, val)  store_32_be(val, ptr)
 #define UNSTORE16_INT(ptr, val) (val = load_16_be(ptr))
 #define UNSTORE32_INT(ptr, val) (val = load_32_be(ptr))
-
-#define KRB5_CONF_KDC_BIND_DN "ldap_kdc_dn"
-#define KRB5_CONF_ADMIN_BIND_DN "ldap_kadmind_dn"
-#define KRB5_CONF_PWD_BIND_DN "ldap_passwd_dn"
 
 #define  KDB_TL_USER_INFO      0x7ffe
 
@@ -223,6 +222,8 @@ typedef struct _krb5_ldap_context {
     k5_mutex_t                    hndl_lock;
     krb5_ldap_krbcontainer_params *krbcontainer;
     krb5_ldap_realm_params        *lrparams;
+    krb5_boolean                  disable_last_success;
+    krb5_boolean                  disable_lockout;
     krb5_context                  kcontext;   /* to set the error code and message */
 } krb5_ldap_context;
 
@@ -249,7 +250,7 @@ krb5_error_code
 krb5_ldap_rebind(krb5_ldap_context *, krb5_ldap_server_handle **);
 
 krb5_error_code
-krb5_ldap_db_get_age(krb5_context, char *, time_t *);
+krb5_ldap_get_age(krb5_context, char *, time_t *);
 
 krb5_error_code
 krb5_ldap_lib_init(void);
@@ -262,17 +263,6 @@ krb5_ldap_alloc( krb5_context kcontext,  void *ptr, size_t size );
 
 void
 krb5_ldap_free( krb5_context kcontext, void *ptr );
-krb5_error_code
-krb5_ldap_get_mkey(krb5_context, krb5_keyblock **);
-
-krb5_error_code
-krb5_ldap_set_mkey(krb5_context, char *, krb5_keyblock *);
-
-krb5_error_code
-krb5_ldap_get_mkey_list (krb5_context context, krb5_keylist_node **key_list);
-
-krb5_error_code
-krb5_ldap_set_mkey_list(krb5_context, krb5_keylist_node *);
 
 krb5_error_code
 krb5_ldap_create(krb5_context , char *, char **);
@@ -299,30 +289,31 @@ has_modify_increment(krb5_context, char *);
 krb5_error_code
 krb5_ldap_free_server_context_params(krb5_ldap_context *ldap_context);
 
+krb5_error_code
+krb5_ldap_check_policy_as(krb5_context kcontext, krb5_kdc_req *request,
+                          krb5_db_entry *client, krb5_db_entry *server,
+                          krb5_timestamp kdc_time, const char **status,
+                          krb5_pa_data ***e_data);
+
+void
+krb5_ldap_audit_as_req(krb5_context kcontext, krb5_kdc_req *request,
+                       krb5_db_entry *client, krb5_db_entry *server,
+                       krb5_timestamp authtime, krb5_error_code error_code);
+
+krb5_error_code
+krb5_ldap_check_allowed_to_delegate(krb5_context context,
+                                    krb5_const_principal client,
+                                    const krb5_db_entry *server,
+                                    krb5_const_principal proxy);
 
 /* DAL functions */
 
-
-krb5_error_code
-krb5_ldap_set_option( krb5_context, int, void * );
 
 krb5_error_code
 krb5_ldap_lock( krb5_context, int );
 
 krb5_error_code
 krb5_ldap_unlock( krb5_context );
-
-krb5_error_code
-krb5_ldap_supported_realms( krb5_context, char ** );
-
-krb5_error_code
-krb5_ldap_free_supported_realms( krb5_context, char ** );
-
-const char *
-krb5_ldap_errcode_2_string( krb5_context, long );
-
-void
-krb5_ldap_release_errcode_string (krb5_context, const char *);
 
 #ifndef HAVE_LDAP_INITIALIZE
 int
@@ -344,12 +335,5 @@ krb5_ldap_lockout_audit(krb5_context context,
                         krb5_db_entry *entry,
                         krb5_timestamp stamp,
                         krb5_error_code status);
-
-/* kdb_ext.c */
-krb5_error_code
-krb5_ldap_invoke(krb5_context context,
-                 unsigned int method,
-                 const krb5_data *req,
-                 krb5_data *rep);
 
 #endif
