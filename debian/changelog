@@ -1,3 +1,20 @@
+krb5 (1.8.3+dfsg-4squeeze8) squeeze-lts; urgency=medium
+
+  * Non-maintainer upload by the Squeeze LTS Team.
+  * Apply upstream patches for several issues:
+    - CVE-2014-4341: denial of service due to improper GSSAPI message
+      validation, Bug: #753624
+    - CVE-2014-4342: denial of service due to improper GSSAPI message
+      validation, Bug: #753625
+    - CVE-2014-4343: double-free in SPNEGO initiator during renegotiation,
+      Closes: #755520
+    - CVE-2014-4344: NULL dereference in SPNEGO acceptor, Bug: #755521
+    - CVE-2014-4345 [MITKRB5-SA-2014-001]: buffer overrun in kadmind with
+      LDAP backend, Bug: #757416
+  * put patches into debian/patches (0026-* .. 0029-*)
+
+ -- Thorsten Alteholz <debian@alteholz.de>  Mon, 18 Jul 2014 18:00:24 +0200
+
 krb5 (1.8.3+dfsg-4squeeze7) oldstable-security; urgency=medium
 
   * Fix "cve-2002-2443: kpasswd udp ping-pong"  (Closes: #708267)
