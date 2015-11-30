@@ -51,10 +51,8 @@ krb5int_build_principal_va(krb5_context context,
     data = malloc(size * sizeof(krb5_data));
     if (!data) { retval = ENOMEM; }
 
-    if (!retval) {
-        r = strdup(realm);
-        if (!r) { retval = ENOMEM; }
-    }
+    if (!retval)
+        r = k5memdup0(realm, rlen, &retval);
 
     if (!retval && first) {
         data[0].length = strlen(first);

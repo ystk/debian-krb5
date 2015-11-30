@@ -642,7 +642,7 @@ kg_unseal_iov(OM_uint32 *minor_status,
     }
 
     ctx = (krb5_gss_ctx_id_rec *)context_handle;
-    if (!ctx->established) {
+    if (ctx->terminated || !ctx->established) {
         *minor_status = KG_CTX_INCOMPLETE;
         return GSS_S_NO_CONTEXT;
     }

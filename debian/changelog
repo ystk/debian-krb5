@@ -1,3 +1,26 @@
+krb5 (1.8.3+dfsg-4squeeze10) squeeze-lts; urgency=medium
+
+  * Non-maintainer upload by the Squeeze LTS Team.
+  * CVE-2015-2697: Fix build_principal memory bug
+  * Backport k5memdup0 from 1.13.2 for that
+  * CVE-2015-2695: Fix SPNEGO context aliasing bugs
+  * The upstream patch for CVE-2015-2695 introduced regressions preventing the
+    use of gss_import_sec_context() with contexts established using SPNEGO;
+    the fixes for those regressions are included here.
+
+ -- Guido Günther <agx@sigxcpu.org>  Sun, 01 Nov 2015 19:54:57 +0100
+
+krb5 (1.8.3+dfsg-4squeeze9) squeeze-lts; urgency=high
+
+  * Non-maintainer upload by the Squeeze LTS Team.
+  * MITKRB5-SA-2015-001
+    - CVE-2014-5352: gss_process_context_token() incorrectly frees context
+    - CVE-2014-9421: kadmind doubly frees partial deserialization results
+    - CVE-2014-9422: kadmind incorrectly validates server principal name
+    - CVE-2014-9423: libgssrpc server applications leak uninitialized bytes
+
+ -- Thorsten Alteholz <debian@alteholz.de>  Wed, 05 Feb 2015 18:00:24 +0100
+
 krb5 (1.8.3+dfsg-4squeeze8) squeeze-lts; urgency=medium
 
   * Non-maintainer upload by the Squeeze LTS Team.
