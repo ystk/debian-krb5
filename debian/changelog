@@ -1,3 +1,21 @@
+krb5 (1.8.3+dfsg-4squeeze11) squeeze-lts; urgency=medium
+
+  * Non-maintainer upload by the Squeeze LTS Team.
+  * patches taken from the Wheezy version 
+    (prepared by Salvatore Bonaccorso)
+  * Verify decoded kadmin C strings [CVE-2015-8629]
+    CVE-2015-8629: An authenticated attacker can cause kadmind to read
+    beyond the end of allocated memory by sending a string without a
+    terminating zero byte. Information leakage may be possible for an
+    attacker with permission to modify the database. (Closes: #813296)
+  * Fix leaks in kadmin server stubs [CVE-2015-8631]
+    CVE-2015-8631: An authenticated attacker can cause kadmind to leak
+    memory by supplying a null principal name in a request which uses one.
+    Repeating these requests will eventually cause kadmind to exhaust all
+    available memory. (Closes: #813126)
+
+ -- Thorsten Alteholz <debian@alteholz.de>  Mon, 22 Feb 2016 18:00:24 +0100
+
 krb5 (1.8.3+dfsg-4squeeze10) squeeze-lts; urgency=medium
 
   * Non-maintainer upload by the Squeeze LTS Team.
