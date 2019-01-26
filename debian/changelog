@@ -1,3 +1,13 @@
+krb5 (1.12.1+dfsg-19+deb8u5) jessie; urgency=medium
+
+  * Non-maintainer upload by the LTS Team. 
+  * CVE-2018-20217
+    Ignore password attributes for S4U2Self requests.
+  * CVE-2018-5729, CVE-2018-5730
+    Fix flaws in LDAP DN checking.
+ 
+ -- Thorsten Alteholz <debian@alteholz.de>  Fri, 25 Jan 2019 16:03:02 +0100
+
 krb5 (1.12.1+dfsg-19+deb8u4) jessie; urgency=medium
 
   * New version number; same code as deb8u3 but rebuilt to build arch all

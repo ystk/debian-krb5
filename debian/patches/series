@@ -41,3 +41,7 @@ prevent-requires_preauth-bypass-cve-2015.patch
 fix-s4u2self-kdc-crash-when-anon-is-rest.patch
 fix-ldap-null-deref-on-empty-arg-cve-201.patch
 prevent-kdc-unset-status-assertion-failu.patch
+
+CVE-2018-20217.patch
+CVE-2018-5729-5730.patch
+
