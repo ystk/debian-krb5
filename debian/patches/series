@@ -45,3 +45,4 @@ prevent-kdc-unset-status-assertion-failu.patch
 CVE-2018-20217.patch
 CVE-2018-5729-5730.patch
 
+CVE-2020-28196.patch

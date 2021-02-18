@@ -1,3 +1,11 @@
+krb5 (1.12.1+dfsg-19+deb8u6) jessie-security; urgency=high
+
+  * CVE-2020-28196: Prevent an issue where the lack of a limit in the ASN.1
+    decoder could lead to infinite recursion and allow an attacker to overrun
+    the stack and cause the process to crash. (Closes: #973880)
+
+ -- Chris Lamb <lamby@debian.org>  Sat, 07 Nov 2020 12:38:53 +0000
+
 krb5 (1.12.1+dfsg-19+deb8u5) jessie; urgency=medium
 
   * Non-maintainer upload by the LTS Team. 
