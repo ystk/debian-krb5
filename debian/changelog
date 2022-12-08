@@ -1,3 +1,12 @@
+krb5 (1.12.1+dfsg-19+deb8u7) jessie-security; urgency=medium
+
+  * Non-maintainer upload by the ELTS Team.
+  * CVE-2022-42898: Prevent integer overflows in PAC parsing; potentially
+    critical for 32-bit KDCs or when cross-realm acts maliciously.
+    (Closes: #1024267)
+
+ -- Helmut Grohne <helmut@subdivi.de>  Wed, 07 Dec 2022 17:02:16 +0100
+
 krb5 (1.12.1+dfsg-19+deb8u6) jessie-security; urgency=high
 
   * CVE-2020-28196: Prevent an issue where the lack of a limit in the ASN.1
