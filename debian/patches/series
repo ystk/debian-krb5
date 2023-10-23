@@ -47,3 +47,5 @@ CVE-2018-5729-5730.patch
 
 CVE-2020-28196.patch
 CVE-2022-42898.patch
+
+0001-Ensure-array-count-consistency-in-kadm5-RPC.patch

@@ -1,3 +1,10 @@
+krb5 (1.12.1+dfsg-19+deb8u8) jessie-security; urgency=medium
+
+  * Non-maintainer upload by the ELTS Security Team.
+  * CVE-2023-36054: Freeing of uninitialized pointer in kadm_rpc_xdr.c
+
+ -- Adrian Bunk <bunk@debian.org>  Mon, 23 Oct 2023 12:56:08 +0300
+
 krb5 (1.12.1+dfsg-19+deb8u7) jessie-security; urgency=medium
 
   * Non-maintainer upload by the ELTS Team.
