@@ -1,0 +1,75 @@
+From ce3b0d171ecd9aaba4d1320048ab52d14ff72be4 Mon Sep 17 00:00:00 2001
+From: Greg Hudson <ghudson@mit.edu>
+Date: Sat, 11 Nov 2017 13:42:28 -0500
+Subject: Length check when parsing GSS token encapsulation
+
+gssint_get_mech_type_oid() is used by gss_accept_sec_context() to
+determine the mechanism of the token.  Without length checking, it
+might read a few bytes past the end of the input token buffer.  Add
+length checking as well as test cases for truncated encapsulations.
+Reported by Bar Katz.
+
+ticket: 8620 (new)
+target_version: 1.16
+target_version: 1.15-next
+target_version: 1.14-next
+tags: pullup
+---
+ src/lib/gssapi/mechglue/g_glue.c | 20 ++++++++++++++------
+ 1 file changed, 14 insertions(+), 6 deletions(-)
+
+diff --git a/src/lib/gssapi/mechglue/g_glue.c b/src/lib/gssapi/mechglue/g_glue.c
+index e438a032c..bfddf64ba 100644
+--- a/src/lib/gssapi/mechglue/g_glue.c
++++ b/src/lib/gssapi/mechglue/g_glue.c
+@@ -189,7 +189,7 @@ OM_uint32 gssint_get_mech_type_oid(OID, token)
+     gss_buffer_t	token;
+ {
+     unsigned char * buffer_ptr;
+-    int length;
++    size_t buflen, lenbytes, length, oidlen;
+ 
+     /*
+      * This routine reads the prefix of "token" in order to determine
+@@ -223,25 +223,33 @@ OM_uint32 gssint_get_mech_type_oid(OID, token)
+     /* Skip past the APP/Sequnce byte and the token length */
+ 
+     buffer_ptr = (unsigned char *) token->value;
++    buflen = token->length;
+ 
+-    if (*(buffer_ptr++) != 0x60)
++    if (buflen < 2 || *buffer_ptr++ != 0x60)
+ 	return (GSS_S_DEFECTIVE_TOKEN);
+     length = *buffer_ptr++;
++    buflen -= 2;
+ 
+ 	/* check if token length is null */
+ 	if (length == 0)
+ 	    return (GSS_S_DEFECTIVE_TOKEN);
+ 
+     if (length & 0x80) {
+-	if ((length & 0x7f) > 4)
++	lenbytes = length & 0x7f;
++	if (lenbytes > 4 || lenbytes > buflen)
+ 	    return (GSS_S_DEFECTIVE_TOKEN);
+-	buffer_ptr += length & 0x7f;
++	buffer_ptr += lenbytes;
++	buflen -= lenbytes;
+     }
+ 
+-    if (*(buffer_ptr++) != 0x06)
++    if (buflen < 2 || *buffer_ptr++ != 0x06)
++	return (GSS_S_DEFECTIVE_TOKEN);
++    oidlen = *buffer_ptr++;
++    buflen -= 2;
++    if (oidlen > 0x7f || oidlen > buflen)
+ 	return (GSS_S_DEFECTIVE_TOKEN);
+ 
+-    OID->length = (OM_uint32) *(buffer_ptr++);
++    OID->length = oidlen;
+     OID->elements = (void *) buffer_ptr;
+     return (GSS_S_COMPLETE);
+ }
+-- 
+2.30.2
+

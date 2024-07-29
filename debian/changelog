@@ -1,3 +1,13 @@
+krb5 (1.12.1+dfsg-19+deb8u9) jessie-security; urgency=medium
+
+  * Non-maintainer upload by the ELTS Team.
+  * CVE-2024-26458: Memory leak in xmt_rmtcallres()
+  * CVE-2024-26461: Memory leak in gss_krb5int_make_seal_token_v3()
+  * CVE-2024-37370: GSS wrap token Extra Count field manipulation
+  * CVE-2024-37371: Invalid GSS memory reads with manipulated tokens
+
+ -- Adrian Bunk <bunk@debian.org>  Mon, 29 Jul 2024 11:44:03 +0300
+
 krb5 (1.12.1+dfsg-19+deb8u8) jessie-security; urgency=medium
 
   * Non-maintainer upload by the ELTS Security Team.

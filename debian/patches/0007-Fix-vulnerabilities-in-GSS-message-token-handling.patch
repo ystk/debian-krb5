@@ -1,0 +1,202 @@
+From d8cda7bf7bda4cc8539ed3fe9e9eba8c6d5ad17c Mon Sep 17 00:00:00 2001
+From: Greg Hudson <ghudson@mit.edu>
+Date: Fri, 14 Jun 2024 10:56:12 -0400
+Subject: Fix vulnerabilities in GSS message token handling
+
+In gss_krb5int_unseal_token_v3() and gss_krb5int_unseal_v3_iov(),
+verify the Extra Count field of CFX wrap tokens against the encrypted
+header.  Reported by Jacob Champion.
+
+In gss_krb5int_unseal_token_v3(), check for a decrypted plaintext
+length too short to contain the encrypted header and extra count
+bytes.  Reported by Jacob Champion.
+
+In kg_unseal_iov_token(), separately track the header IOV length and
+complete token length when parsing the token's ASN.1 wrapper.  This
+fix contains modified versions of functions from k5-der.h and
+util_token.c; this duplication will be cleaned up in a future commit.
+
+CVE-2024-37370:
+
+In MIT krb5 release 1.3 and later, an attacker can modify the
+plaintext Extra Count field of a confidential GSS krb5 wrap token,
+causing the unwrapped token to appear truncated to the application.
+
+CVE-2024-37371:
+
+In MIT krb5 release 1.3 and later, an attacker can cause invalid
+memory reads by sending message tokens with invalid length fields.
+
+(cherry picked from commit b0a2f8a5365f2eec3e27d78907de9f9d2c80505a)
+
+ticket: 9128
+version_fixed: 1.21.3
+---
+ src/lib/gssapi/krb5/k5sealv3.c    |  5 ++
+ src/lib/gssapi/krb5/k5sealv3iov.c |  3 +-
+ src/lib/gssapi/krb5/k5unsealiov.c | 80 ++++++++++++++++++++++++++++---
+ 3 files changed, 80 insertions(+), 8 deletions(-)
+
+diff --git a/src/lib/gssapi/krb5/k5sealv3.c b/src/lib/gssapi/krb5/k5sealv3.c
+index 2da685044..f9881befd 100644
+--- a/src/lib/gssapi/krb5/k5sealv3.c
++++ b/src/lib/gssapi/krb5/k5sealv3.c
+@@ -404,10 +404,15 @@ gss_krb5int_unseal_token_v3(krb5_context *contextptr,
+             /* Don't use bodysize here!  Use the fact that
+                cipher.ciphertext.length has been adjusted to the
+                correct length.  */
++            if (plain.length < 16 + ec) {
++                free(plain.data);
++                goto defective;
++            }
+             althdr = (unsigned char *)plain.data + plain.length - 16;
+             if (load_16_be(althdr) != KG2_TOK_WRAP_MSG
+                 || althdr[2] != ptr[2]
+                 || althdr[3] != ptr[3]
++                || load_16_be(althdr+4) != ec
+                 || memcmp(althdr+8, ptr+8, 8)) {
+                 free(plain.data);
+                 goto defective;
+diff --git a/src/lib/gssapi/krb5/k5sealv3iov.c b/src/lib/gssapi/krb5/k5sealv3iov.c
+index 8f6c4d441..8a3d140b3 100644
+--- a/src/lib/gssapi/krb5/k5sealv3iov.c
++++ b/src/lib/gssapi/krb5/k5sealv3iov.c
+@@ -406,9 +406,10 @@ gss_krb5int_unseal_v3_iov(krb5_context context,
+             if (load_16_be(althdr) != KG2_TOK_WRAP_MSG
+                 || althdr[2] != ptr[2]
+                 || althdr[3] != ptr[3]
++                || load_16_be(althdr + 4) != ec
+                 || memcmp(althdr + 8, ptr + 8, 8) != 0) {
+                 *minor_status = 0;
+-                return GSS_S_BAD_SIG;
++                return GSS_S_DEFECTIVE_TOKEN;
+             }
+         } else {
+             /* Verify checksum: note EC is checksum size here, not padding */
+diff --git a/src/lib/gssapi/krb5/k5unsealiov.c b/src/lib/gssapi/krb5/k5unsealiov.c
+index 191de2cff..35e571b63 100644
+--- a/src/lib/gssapi/krb5/k5unsealiov.c
++++ b/src/lib/gssapi/krb5/k5unsealiov.c
+@@ -27,6 +27,7 @@
+ #include <assert.h>
+ #include "k5-platform.h"        /* for 64-bit support */
+ #include "k5-int.h"          /* for zap() */
++#include "k5-der.h"
+ #include "gssapiP_krb5.h"
+ #include <stdarg.h>
+ 
+@@ -297,6 +298,73 @@ cleanup:
+     return retval;
+ }
+ 
++/* Similar to k5_der_get_value(), but output an unchecked content length
++ * instead of a k5input containing the contents. */
++static inline bool
++get_der_tag(struct k5input *in, uint8_t idbyte, size_t *len_out)
++{
++    uint8_t lenbyte, i;
++    size_t len;
++
++    /* Do nothing if in is empty or the next byte doesn't match idbyte. */
++    if (in->status || in->len == 0 || *in->ptr != idbyte)
++        return false;
++
++    /* Advance past the identifier byte and decode the length. */
++    (void)k5_input_get_byte(in);
++    lenbyte = k5_input_get_byte(in);
++    if (lenbyte < 128) {
++        len = lenbyte;
++    } else {
++        len = 0;
++        for (i = 0; i < (lenbyte & 0x7F); i++) {
++            if (len > (SIZE_MAX >> 8)) {
++                k5_input_set_status(in, EOVERFLOW);
++                return false;
++            }
++            len = (len << 8) | k5_input_get_byte(in);
++        }
++    }
++
++    if (in->status)
++        return false;
++
++    *len_out = len;
++    return true;
++}
++
++/*
++ * Similar to g_verify_token_header() without toktype or flags, but do not read
++ * more than *header_len bytes of ASN.1 wrapper, and on output set *header_len
++ * to the remaining number of header bytes.  Verify the outer DER tag's length
++ * against token_len, which may be larger (but not smaller) than *header_len.
++ */
++static gss_int32
++verify_detached_wrapper(const gss_OID_desc *mech, size_t *header_len,
++                        uint8_t **header_in, size_t token_len)
++{
++    struct k5input in, mech_der;
++    gss_OID_desc toid;
++    size_t len;
++
++    k5_input_init(&in, *header_in, *header_len);
++
++    if (get_der_tag(&in, 0x60, &len)) {
++        if (len != token_len - (in.ptr - *header_in))
++            return G_BAD_TOK_HEADER;
++        if (!k5_der_get_value(&in, 0x06, &mech_der))
++            return G_BAD_TOK_HEADER;
++        toid.elements = (uint8_t *)mech_der.ptr;
++        toid.length = mech_der.len;
++        if (!g_OID_equal(&toid, mech))
++            return G_WRONG_MECH;
++    }
++
++    *header_in = (uint8_t *)in.ptr;
++    *header_len = in.len;
++    return 0;
++}
++
+ /*
+  * Caller must provide TOKEN | DATA | PADDING | TRAILER, except
+  * for DCE in which case it can just provide TOKEN | DATA (must
+@@ -317,8 +385,7 @@ kg_unseal_iov_token(OM_uint32 *minor_status,
+     gss_iov_buffer_t header;
+     gss_iov_buffer_t padding;
+     gss_iov_buffer_t trailer;
+-    size_t input_length;
+-    unsigned int bodysize;
++    size_t input_length, hlen;
+     int toktype2;
+ 
+     header = kg_locate_header_iov(iov, iov_count, toktype);
+@@ -348,15 +415,14 @@ kg_unseal_iov_token(OM_uint32 *minor_status,
+             input_length += trailer->buffer.length;
+     }
+ 
+-    code = g_verify_token_header(ctx->mech_used,
+-                                 &bodysize, &ptr, -1,
+-                                 input_length, 0);
++    hlen = header->buffer.length;
++    code = verify_detached_wrapper(ctx->mech_used, &hlen, &ptr, input_length);
+     if (code != 0) {
+         *minor_status = code;
+         return GSS_S_DEFECTIVE_TOKEN;
+     }
+ 
+-    if (bodysize < 2) {
++    if (hlen < 2) {
+         *minor_status = (OM_uint32)G_BAD_TOK_HEADER;
+         return GSS_S_DEFECTIVE_TOKEN;
+     }
+@@ -364,7 +430,7 @@ kg_unseal_iov_token(OM_uint32 *minor_status,
+     toktype2 = load_16_be(ptr);
+ 
+     ptr += 2;
+-    bodysize -= 2;
++    hlen -= 2;
+ 
+     switch (toktype2) {
+     case KG2_TOK_MIC_MSG:
+-- 
+2.30.2
+

@@ -1,0 +1,64 @@
+From 19a785e3fe0742d4b24dfb43fa4b474076b56e43 Mon Sep 17 00:00:00 2001
+From: Greg Hudson <ghudson@mit.edu>
+Date: Sun, 4 May 2014 15:43:35 -0400
+Subject: Add k5_buf_get_space
+
+Add a new k5_buf method to make room in the buffer for the caller to
+fill in.
+---
+ src/include/k5-buf.h                          |  4 ++++
+ src/util/support/k5buf.c                      | 10 ++++++++++
+ src/util/support/libkrb5support-fixed.exports |  1 +
+ 3 files changed, 15 insertions(+)
+
+diff --git a/src/include/k5-buf.h b/src/include/k5-buf.h
+index c5576a3e3..da10fd9f4 100644
+--- a/src/include/k5-buf.h
++++ b/src/include/k5-buf.h
+@@ -91,6 +91,10 @@ void k5_buf_add_fmt(struct k5buf *buf, const char *fmt, ...)
+ #endif
+     ;
+ 
++/* Extend the length of buf by len and return a pointer to the reserved space,
++ * to be filled in by the caller.  Return NULL on error. */
++void *k5_buf_get_space(struct k5buf *buf, size_t len);
++
+ /* Truncate BUF.  LEN must be between 0 and the existing buffer
+  * length, or an assertion failure will result. */
+ void k5_buf_truncate(struct k5buf *buf, size_t len);
+diff --git a/src/util/support/k5buf.c b/src/util/support/k5buf.c
+index 778e68b39..c3c81b0b2 100644
+--- a/src/util/support/k5buf.c
++++ b/src/util/support/k5buf.c
+@@ -191,6 +191,16 @@ k5_buf_add_fmt(struct k5buf *buf, const char *fmt, ...)
+     free(tmp);
+ }
+ 
++void *
++k5_buf_get_space(struct k5buf *buf, size_t len)
++{
++    if (!ensure_space(buf, len))
++        return NULL;
++    buf->len += len;
++    buf->data[buf->len] = '\0';
++    return &buf->data[buf->len - len];
++}
++
+ void
+ k5_buf_truncate(struct k5buf *buf, size_t len)
+ {
+diff --git a/src/util/support/libkrb5support-fixed.exports b/src/util/support/libkrb5support-fixed.exports
+index 2f38242d9..f5fbe9e0c 100644
+--- a/src/util/support/libkrb5support-fixed.exports
++++ b/src/util/support/libkrb5support-fixed.exports
+@@ -6,6 +6,7 @@ k5_buf_init_dynamic
+ k5_buf_add
+ k5_buf_add_len
+ k5_buf_add_fmt
++k5_buf_get_space
+ k5_buf_truncate
+ k5_buf_data
+ k5_buf_len
+-- 
+2.30.2
+

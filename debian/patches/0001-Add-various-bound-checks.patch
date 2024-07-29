@@ -1,0 +1,122 @@
+From fd63d43decce5131739eadaa3bd8542d60e207e3 Mon Sep 17 00:00:00 2001
+From: Martin Kittel <martin.kittel@sap.com>
+Date: Thu, 6 Apr 2017 21:03:23 +0200
+Subject: Add various bound checks
+
+Add bounds checks where Coverity otherwise reports a defect.  Most of
+these checks are unlikely to be triggered in practice (Unicode regexps
+are unused, and the caller of gss_krb5int_make_seal_token_v3 won't
+have a plaintext object larger than half of the address space).  The
+checks in dump.c could prevent memory access errors resulting from a
+malformed dump file.
+
+[ghudson@mit.edu: rewrote commit message]
+
+ticket: 8578 (new)
+---
+ src/kadmin/dbutil/dump.c       | 14 +++++++++++++-
+ src/lib/gssapi/krb5/k5sealv3.c |  8 +++++++-
+ src/lib/kdb/kdb_default.c      |  2 +-
+ src/lib/krb5/unicode/ure/ure.c |  2 +-
+ 4 files changed, 22 insertions(+), 4 deletions(-)
+
+diff --git a/src/kadmin/dbutil/dump.c b/src/kadmin/dbutil/dump.c
+index e31dd65f8..00dce9a63 100644
+--- a/src/kadmin/dbutil/dump.c
++++ b/src/kadmin/dbutil/dump.c
+@@ -686,6 +686,10 @@ process_tl_data(const char *fname, FILE *filep, int lineno,
+                      _("cannot read tagged data type and length"));
+             return EINVAL;
+         }
++        if (i1 < INT16_MIN || i1 > INT16_MAX || u1 > UINT16_MAX) {
++            load_err(fname, lineno, _("data type or length overflowed"));
++            return EINVAL;
++        }
+         tl->tl_data_type = i1;
+         tl->tl_data_length = u1;
+         if (read_octets_or_minus1(filep, tl->tl_data_length,
+@@ -734,6 +738,10 @@ process_k5beta7_princ(krb5_context context, const char *fname, FILE *filep,
+         goto fail;
+ 
+     /* Get memory for and form tagged data linked list */
++    if (u3 > UINT16_MAX) {
++        load_err(fname, *linenop, _("cannot allocate tl_data (too large)"));
++        goto fail;
++    }
+     if (alloc_tl_data(u3, &dbentry->tl_data))
+         goto fail;
+     dbentry->n_tl_data = u3;
+@@ -822,13 +830,17 @@ process_k5beta7_princ(krb5_context context, const char *fname, FILE *filep,
+             load_err(fname, *linenop, _("cannot read key size and version"));
+             goto fail;
+         }
++        if (t1 > KRB5_KDB_V1_KEY_DATA_ARRAY) {
++            load_err(fname, *linenop, _("unsupported key_data_ver version"));
++            goto fail;
++        }
+ 
+         kd->key_data_ver = t1;
+         kd->key_data_kvno = t2;
+ 
+         for (j = 0; j < t1; j++) {
+             nread = fscanf(filep, "%d\t%d\t", &t3, &t4);
+-            if (nread != 2) {
++            if (nread != 2 || t4 < 0) {
+                 load_err(fname, *linenop,
+                          _("cannot read key type and length"));
+                 goto fail;
+diff --git a/src/lib/gssapi/krb5/k5sealv3.c b/src/lib/gssapi/krb5/k5sealv3.c
+index e4c2c2f8f..501fc1e83 100644
+--- a/src/lib/gssapi/krb5/k5sealv3.c
++++ b/src/lib/gssapi/krb5/k5sealv3.c
+@@ -113,6 +113,7 @@ gss_krb5int_make_seal_token_v3 (krb5_context context,
+         krb5_data plain;
+         krb5_enc_data cipher;
+         size_t ec_max;
++        size_t encrypt_size;
+ 
+         /* 300: Adds some slop.  */
+         if (SIZE_MAX - 300 < message->length)
+@@ -131,7 +132,12 @@ gss_krb5int_make_seal_token_v3 (krb5_context context,
+             return err;
+ 
+         /* Get size of ciphertext.  */
+-        bufsize = 16 + krb5_encrypt_size (plain.length, key->keyblock.enctype);
++        encrypt_size = krb5_encrypt_size(plain.length, key->keyblock.enctype);
++        if (encrypt_size > SIZE_MAX / 2) {
++            err = ENOMEM;
++            goto error;
++        }
++        bufsize = 16 + encrypt_size;
+         /* Allocate space for header plus encrypted data.  */
+         outbuf = gssalloc_malloc(bufsize);
+         if (outbuf == NULL) {
+diff --git a/src/lib/kdb/kdb_default.c b/src/lib/kdb/kdb_default.c
+index 9a7f757f9..8e5df9c2b 100644
+--- a/src/lib/kdb/kdb_default.c
++++ b/src/lib/kdb/kdb_default.c
+@@ -280,7 +280,7 @@ krb5_db_def_fetch_mkey_stash(krb5_context   context,
+     key->length = keylength;
+ #endif
+ 
+-    if (!key->length || ((int) key->length) < 0) {
++    if (!key->length || key->length > 1024) {
+         retval = KRB5_KDB_BADSTORED_MKEY;
+         goto errout;
+     }
+diff --git a/src/lib/krb5/unicode/ure/ure.c b/src/lib/krb5/unicode/ure/ure.c
+index 91ef7c95b..3e16b9441 100644
+--- a/src/lib/krb5/unicode/ure/ure.c
++++ b/src/lib/krb5/unicode/ure/ure.c
+@@ -421,7 +421,7 @@ _ure_prop_list(ucs2_t *pp, unsigned long limit, unsigned long *mask,
+           b->error = _URE_INVALID_PROPERTY;
+     }
+ 
+-    if (n != 0)
++    if (b->error == _URE_OK && n != 0)
+       m |= cclass_flags[n];
+ 
+     /*
+-- 
+2.30.2
+

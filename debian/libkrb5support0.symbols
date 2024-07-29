@@ -7,6 +7,7 @@ libkrb5support.so.0 libkrb5support0 #MINVER#
  k5_buf_add_fmt@krb5support_0_MIT 1.12~alpha1+dfsg
  k5_buf_add_len@krb5support_0_MIT 1.12~alpha1+dfsg
  k5_buf_data@krb5support_0_MIT 1.12~alpha1+dfsg
+ k5_buf_get_space@krb5support_0_MIT 1.12.1+dfsg-19+deb8u9~
  k5_buf_init_dynamic@krb5support_0_MIT 1.12~alpha1+dfsg
  k5_buf_init_fixed@krb5support_0_MIT 1.12~alpha1+dfsg
  k5_buf_len@krb5support_0_MIT 1.12~alpha1+dfsg

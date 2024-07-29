@@ -49,3 +49,11 @@ CVE-2020-28196.patch
 CVE-2022-42898.patch
 
 0001-Ensure-array-count-consistency-in-kadm5-RPC.patch
+
+0001-Add-various-bound-checks.patch
+0002-Fix-two-unlikely-memory-leaks.patch
+0003-Length-check-when-parsing-GSS-token-encapsulation.patch
+0004-Add-k5_buf_get_space.patch
+0005-Add-k5-input.h.patch
+0006-Add-a-simple-DER-support-header.patch
+0007-Fix-vulnerabilities-in-GSS-message-token-handling.patch
