@@ -57,3 +57,4 @@ CVE-2022-42898.patch
 0005-Add-k5-input.h.patch
 0006-Add-a-simple-DER-support-header.patch
 0007-Fix-vulnerabilities-in-GSS-message-token-handling.patch
+CVE-2025-24528.patch

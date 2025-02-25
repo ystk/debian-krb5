@@ -1,3 +1,11 @@
+krb5 (1.12.1+dfsg-19+deb8u10) jessie-security; urgency=medium
+
+  * Non Maintainer upload by LTS team
+  * Fixes CVE-2024-26462 (Closes: #1064965)
+    A memory leak vulnerability was found in /krb5/src/kdc/ndr.c.
+
+ -- Bastien Roucariès <rouca@debian.org>  Sun, 23 Feb 2025 20:54:17 +0000
+
 krb5 (1.12.1+dfsg-19+deb8u9) jessie-security; urgency=medium
 
   * Non-maintainer upload by the ELTS Team.
