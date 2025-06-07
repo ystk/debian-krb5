@@ -1,3 +1,33 @@
+krb5 (1.12.1+dfsg-19+deb8u11) jessie-security; urgency=medium
+
+  * Non Maintainer upload by the ELTS team
+  * Fix CVE-2025-3576. Closes: #1103525
+    A Vulnerability in the MIT Kerberos implementation
+    allows GSSAPI-protected messages using RC4-HMAC-MD5
+    to be spoofed due to weaknesses in the MD5 checksum design.
+    If RC4 is preferred over stronger encryption types,
+    an attacker could exploit MD5 collisions to forge message
+    integrity codes. This may lead to unauthorized
+    message tampering.
+  * Because of the possibility of breaking certain older
+    authentication systems, the configuration variables which
+    have been introduced as part of the fix (allow_rc4 and
+    allow_des3) are treated as 'true' by default. This leaves
+    the 3DES and RC4 algorithms enabled, but administrators
+    are strongly encouraged to disable them after verifying
+    compatibility in their environments.
+  * In KDC, assume all services support aes256-sha1
+    To facilitate negotiating session keys with acceptable security,
+    assume that services support aes256-cts-hmac-sha1 unless a
+    session_enctypes string attribute says otherwise.
+  * Add krb5int_c_deprecated_enctype() checks for the
+    ETYPE_DEPRECATED flag on enctypes.
+    All ENCTYPE_WEAK enctypes are currently deprecated; not all
+    deprecated enctypes are considered weak.
+    Deprecations follow RFC 6649 and RFC 8429.
+
+ -- Bastien Roucariès <rouca@debian.org>  Mon, 26 May 2025 22:14:10 +0200
+
 krb5 (1.12.1+dfsg-19+deb8u10) jessie-security; urgency=medium
 
   * Non Maintainer upload by LTS team

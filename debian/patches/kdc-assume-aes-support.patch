@@ -1,0 +1,45 @@
+From: Greg Hudson <ghudson@mit.edu>
+Date: Wed, 14 Dec 2022 13:20:46 -0500
+Subject: [PATCH] In KDC, assume all services support aes256-sha1
+
+To facilitate negotiating session keys with acceptable security,
+assume that services support aes256-cts-hmac-sha1 unless a
+session_enctypes string attribute says otherwise.
+
+ticket: 9075
+origin: backport, https://github.com/krb5/krb5/commit/2cbd847e0e92bc4e219b65c770ae33f851b22afc
+---
+ src/kdc/kdc_util.c         | 4 ++++
+ src/tests/t_keyrollover.py | 6 +++---
+ 2 files changed, 7 insertions(+), 3 deletions(-)
+
+Index: krb5/src/kdc/kdc_util.c
+===================================================================
+--- krb5.orig/src/kdc/kdc_util.c	2025-05-10 21:30:25.700026467 +0200
++++ krb5/src/kdc/kdc_util.c	2025-05-10 21:30:25.696026457 +0200
+@@ -910,6 +910,10 @@
+     if (enctype == ENCTYPE_DES_CBC_MD5)
+         return FALSE;
+ 
++    /* Assume every server without a session_enctypes attribute supports
++     * aes256-cts-hmac-sha1-96. */
++    if (enctype == ENCTYPE_AES256_CTS_HMAC_SHA1_96)
++        return TRUE;
+     /* Assume the server supports any enctype it has a long-term key for. */
+     return !krb5_dbe_find_enctype(kdc_context, server, enctype, -1, 0, &datap);
+ }
+Index: krb5/src/tests/t_keyrollover.py
+===================================================================
+--- krb5.orig/src/tests/t_keyrollover.py	2025-05-10 21:30:25.700026467 +0200
++++ krb5/src/tests/t_keyrollover.py	2025-05-10 21:30:25.696026457 +0200
+@@ -24,8 +24,8 @@
+ # Make sure an old TGT fails after purging old TGS key.
+ realm.run([kvno, princ2], expected_code=1)
+ output = realm.run([klist, '-e'])
+-
+-expected = 'krbtgt/%s@%s\n\tEtype (skey, tkt): des-cbc-crc, des-cbc-crc' % \
++expected = 'krbtgt/%s@%s\n\tEtype (skey, tkt): ' \
++    'aes256-cts-hmac-sha1-96, aes128-cts-hmac-sha256-128' % \
+     (realm.realm, realm.realm)
+ 
+ if expected not in output:

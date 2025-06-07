@@ -1,0 +1,15 @@
+include:
+  - https://salsa.debian.org/lts-team/pipeline/raw/master/recipes/debian.yml
+
+variables:
+  RELEASE: 'jessie'
+  SALSA_CI_COMPONENTS: 'main contrib non-free'
+  SALSA_CI_DISABLE_REPROTEST: 1
+  SALSA_CI_DISABLE_LINTIAN: 1
+  SALSA_CI_DISABLE_APTLY: 0
+
+blhc:
+  allow_failure: true
+
+piuparts:
+  allow_failure: true

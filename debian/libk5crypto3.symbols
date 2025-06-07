@@ -105,3 +105,4 @@ libk5crypto.so.3 libk5crypto3 #MINVER#
  mit_crc32@k5crypto_3_MIT 1.6.dfsg.2
  valid_cksumtype@k5crypto_3_MIT 1.6.dfsg.2
  valid_enctype@k5crypto_3_MIT 1.6.dfsg.2
+ krb5int_c_deprecated_enctype@k5crypto_3_MIT 1.12.1+dfsg-19+deb8u11

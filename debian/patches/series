@@ -58,3 +58,8 @@ CVE-2022-42898.patch
 0006-Add-a-simple-DER-support-header.patch
 0007-Fix-vulnerabilities-in-GSS-message-token-handling.patch
 CVE-2025-24528.patch
+kdc-assume-aes-support.patch
+CVE-2025-3576~pre1.patch
+CVE-2025-3576~pre2.patch
+CVE-2025-3576.patch
+rc4-des-enable-by-default.patch

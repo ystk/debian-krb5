@@ -1,0 +1,72 @@
+From: =?utf-8?q?Bastien_Roucari=C3=A8s?= <rouca@debian.org>
+Date: Mon, 26 May 2025 22:01:31 +0200
+Subject: Do not disable rc4/des by default
+
+A concerned administrator could simply configure a KDC to not
+make use of RC4 and MD5 for issuing tickets and to reject requests
+involving those same algorithms. For example, an administrator could
+configure the libdefaults configuration variable 'permitted_enctypes' to
+only include the AES types, which effectively defeats this attack.
+
+CVE-2025-3576 is linked to a news article describing some issues that
+Microsoft experienced related to the deployment of their mitigation for
+this CVE. This is notable because the Microsoft ecosystem is mostly
+closed, and Microsoft themselves exercise substantial influence over
+many facets of the systems that run their software. In the case of MIT
+Kerberos on Debian, we are not in such a position. This seems to me a
+reason to think that we face an even greater possibility of some sort of
+disruptive problem affecting users.
+
+Thus for older debian version disabling RC4/3DES by default is risky. This
+change leaves the 3DES and RC4 algorithms enabled, but administrators are
+strongly encouraged to disable them after verifying compatibility in their
+environments.
+
+forwarded: not-needed
+---
+ doc/admin/conf_files/krb5_conf.rst | 8 ++++----
+ src/lib/krb5/krb/init_ctx.c        | 4 ++--
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+Index: krb5/doc/admin/conf_files/krb5_conf.rst
+===================================================================
+--- krb5.orig/doc/admin/conf_files/krb5_conf.rst	2025-05-26 23:00:13.699022526 +0200
++++ krb5/doc/admin/conf_files/krb5_conf.rst	2025-05-26 23:00:13.699022526 +0200
+@@ -101,14 +101,14 @@
+ **allow_des3**
+     Permit the KDC to issue tickets with des3-cbc-sha1 session keys.
+     In future releases, this flag will allow des3-cbc-sha1 to be used
+-    at all.  The default value for this tag is false.  (Added in
+-    release 1.21.)
++    at all.  The default value for this tag is false for bookworm,
++    true before
+ 
+ **allow_rc4**
+     Permit the KDC to issue tickets with arcfour-hmac session keys.
+     In future releases, this flag will allow arcfour-hmac to be used
+-    at all.  The default value for this tag is false.  (Added in
+-    release 1.21.)
++    at all.  The default value for this tag is false for bookworm, true
++    before
+ 
+ **allow_weak_crypto**
+     If this flag is set to false, then weak encryption types (as noted
+Index: krb5/src/lib/krb5/krb/init_ctx.c
+===================================================================
+--- krb5.orig/src/lib/krb5/krb/init_ctx.c	2025-05-26 23:00:13.699022526 +0200
++++ krb5/src/lib/krb5/krb/init_ctx.c	2025-05-26 23:00:13.699022526 +0200
+@@ -205,12 +205,12 @@
+         goto cleanup;
+     ctx->allow_weak_crypto = tmp;
+ 
+-    retval = get_boolean(ctx, KRB5_CONF_ALLOW_DES3, 0, &tmp);
++    retval = get_boolean(ctx, KRB5_CONF_ALLOW_DES3, 1, &tmp);
+     if (retval)
+         goto cleanup;
+     ctx->allow_des3 = tmp;
+ 
+-    retval = get_boolean(ctx, KRB5_CONF_ALLOW_RC4, 0, &tmp);
++    retval = get_boolean(ctx, KRB5_CONF_ALLOW_RC4, 1, &tmp);
+     if (retval)
+         goto cleanup;
+     ctx->allow_rc4 = tmp;

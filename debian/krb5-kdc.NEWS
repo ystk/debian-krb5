@@ -1,0 +1,19 @@
+krb5 (1.12.1+dfsg-19+deb8u11) jessie-security; urgency=medium
+
+  In order to fix CVE-2025-3576, vulnerable cryptographic
+  algorithms for tickets need to be disabled explicitly
+  with the new allow_rc4 or allow_des3 variables.
+
+  According to the vulnerability report "Kerberos’ RC4-HMAC broken
+  in practice: spoofing PACs with MD5 collisions", disabling
+  this cryptographic algorithm may break some older
+  authentication systems, and administrators should test carefully.
+
+  Because of the risk of breaking certain configurations, the
+  new allow_rc4 or allow_des3 are being treated as having a
+  default value of 'true' for updates to older Debian releases.
+  This leaves the 3DES and RC4 algorithms enabled, but administrators
+  are strongly encouraged to disable them after verifying
+  compatibility in their environments.
+
+ -- Bastien Roucariès <rouca@debian.org>  Sun, 04 May 2025 22:44:14 +0200
